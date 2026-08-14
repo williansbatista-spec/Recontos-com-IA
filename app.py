@@ -128,12 +128,12 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
     
     try:
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-flash-latest",
             contents=f"{system_instruction}\n\nAção/Contexto: {prompt_usuario}"
         )
     except Exception:
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+            model="gemini-flash-latest",
             contents=f"{system_instruction}\n\nAção/Contexto: {prompt_usuario}"
         )
     
