@@ -7,7 +7,7 @@ import io
 from huggingface_hub import InferenceClient
 
 # ---------------------------------------------------------------------------
-# 1. CONFIGURAÇÃO INICIAL DA PÁGINA
+# 1. CONFIGURAÇÃO INICIAL DA PÁGINA E ESTILOS
 # ---------------------------------------------------------------------------
 st.set_page_config(
     page_title="RPG Educativo Interativo",
@@ -48,19 +48,19 @@ ESTILOS = {
 }
 
 # ---------------------------------------------------------------------------
-# 3. BARRA LATERAL: CONFIGURAÇÕES E CHAVES DE API
+# 3. BARRA LATERAL: CONFIGURAÇÕES DA SALA E APENAS STATUS DAS CHAVES
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.header("🔑 Configurações de API")
+    st.header("⚙️ Configurações da Aula")
     
-    # Busca primeiro nos Secrets; se não achar, exibe o campo na tela
+    # Carregamento silencioso via Secrets ou Fallback seguro
     gemini_key = st.secrets.get("GEMINI_API_KEY") or st.text_input("Gemini API Key", type="password")
     hf_token = st.secrets.get("HF_TOKEN") or st.text_input("Hugging Face Token", type="password")
     
     if gemini_key and hf_token:
-        st.success("✅ Chaves de API ativas!")
+        st.success("🟢 Sistema Conectado")
     else:
-        st.warning("⚠️ Adicione as chaves no Secrets para jogar.")
+        st.warning("⚠️ Insira as chaves nos Secrets para iniciar.")
 
     st.divider()
     st.header("🏫 Perfil da Turma")
@@ -85,13 +85,10 @@ with st.sidebar:
         st.rerun()
 
 # ---------------------------------------------------------------------------
-# 4. INICIALIZAÇÃO DO ESTADO DA SESSÃO (SESSION STATE)
+# 4. INICIALIZAÇÃO DO ESTADO DA SESSÃO
 # ---------------------------------------------------------------------------
 if "historico" not in st.session_state:
     st.session_state.historico = []
-
-if "opcoes" not in st.session_state:
-    st.session_state.opcoes = []
 
 if "imagem_atual" not in st.session_state:
     st.session_state.imagem_atual = None
@@ -100,10 +97,9 @@ if "jogo_iniciado" not in st.session_state:
     st.session_state.jogo_iniciado = False
 
 # ---------------------------------------------------------------------------
-# 5. FUNÇÕES AUXILIARES DE IA (TEXTO E IMAGEM)
+# 5. FUNÇÕES DE IA (GEMINI E FLUX.1)
 # ---------------------------------------------------------------------------
 def gerar_texto_gemini(prompt_usuario, api_key):
-    """Gera a narrativa e as opções do RPG via Gemini SDK"""
     try:
         client = genai.Client(api_key=api_key)
         
@@ -131,7 +127,6 @@ def gerar_texto_gemini(prompt_usuario, api_key):
         return None
 
 def gerar_imagem_hf(prompt_cena, token):
-    """Gera a ilustração da cena via Hugging Face Serverless API (FLUX.1-schnell)"""
     try:
         client = InferenceClient(api_key=token)
         prompt_final = f"{prompt_cena}, {prompt_estilo_base}"
@@ -146,12 +141,12 @@ def gerar_imagem_hf(prompt_cena, token):
         return None
 
 # ---------------------------------------------------------------------------
-# 6. INTERFACE E FLUXO DO JOGO
+# 6. INTERFACE E FLUXO PRINCIPAL DO JOGO
 # ---------------------------------------------------------------------------
 if not gemini_key or not hf_token:
-    st.info("👈 Por favor, configure suas chaves de API na barra lateral ou nos Secrets para iniciar.")
+    st.info("👈 Por favor, certifique-se de que as chaves de API estão cadastradas nos Secrets do Streamlit.")
 else:
-    # TELA INICIAL: ESCOLHA DA AVENTURA
+    # TELA DE SELEÇÃO INICIAL
     if not st.session_state.jogo_iniciado:
         st.subheader("🚀 Escolha o Cenário Pedagógico")
         
@@ -160,7 +155,7 @@ else:
         with col1:
             st.markdown("### 🪵 As Aventuras de Tom Sawyer")
             st.write("Explore o Rio Mississippi no século XIX com Tom Sawyer e Huck Finn. Foco em literatura e história.")
-            if st.button("Iniciar Tom Sawyer"):
+            if st.button("Iniciar Tom Sawyer", type="primary"):
                 st.session_state.personagem = "Tom Sawyer"
                 st.session_state.contexto = "Tom Sawyer e seu amigo Huck Finn nas margens do Rio Mississippi no século XIX."
                 st.session_state.jogo_iniciado = True
@@ -175,7 +170,7 @@ else:
         with col2:
             st.markdown("### 📖 O Diário de Anne Frank")
             st.write("Acompanhe o contexto histórico da Segunda Guerra Mundial com empatia, respeito e consciência reflexiva.")
-            if st.button("Iniciar Anne Frank"):
+            if st.button("Iniciar Anne Frank", type="primary"):
                 st.session_state.personagem = "Anne Frank"
                 st.session_state.contexto = "Anne Frank e o contexto do Anexo Secreto em Amsterdã durante a Segunda Guerra Mundial."
                 st.session_state.jogo_iniciado = True
@@ -187,18 +182,18 @@ else:
                         st.session_state.historico.append({"role": "mestre", "content": resposta})
                 st.rerun()
 
-    # TELA DO JOGO EM ANDAMENTO
+    # TELA DE JOGO ATIVA
     else:
         st.subheader(f"📖 Aventura: {st.session_state.get('personagem', 'RPG')}")
         
-        # Exibe o histórico de texto
+        # Histórico da História
         for mensagem in st.session_state.historico:
             if mensagem["role"] == "mestre":
                 st.markdown(mensagem["content"])
             elif mensagem["role"] == "aluno":
-                st.info(f"📍 **Escolha da turma:** {mensagem['content']}")
+                st.info(f"📍 **Decisão da Turma:** {mensagem['content']}")
 
-        # Tenta extrair o prompt da imagem da última resposta
+        # Extração de prompt para imagem
         if st.session_state.historico:
             ultima_resposta = st.session_state.historico[-1]["content"]
             if "[CENA:" in ultima_resposta:
@@ -206,38 +201,39 @@ else:
                 fim = ultima_resposta.find("]", inicio)
                 prompt_cena = ultima_resposta[inicio:fim].strip()
                 
-                # Botão para gerar a ilustração da rodada
-                if st.button("🎨 Gerar/Atualizar Ilustração da Cena"):
-                    with st.spinner("O FLUX.1 está desenhando a cena..."):
-                        img = gerar_imagem_hf(prompt_cena, hf_token)
-                        if img:
-                            st.session_state.imagem_atual = img
+                col_img1, col_img2 = st.columns([1, 4])
+                with col_img1:
+                    if st.button("🎨 Ilustrar Cena"):
+                        with st.spinner("Gerando ilustração..."):
+                            img = gerar_imagem_hf(prompt_cena, hf_token)
+                            if img:
+                                st.session_state.imagem_atual = img
             
         if st.session_state.imagem_atual:
             st.image(st.session_state.imagem_atual, use_container_width=True)
 
         st.divider()
 
-        # Entrada para o próximo passo dos alunos
-        st.subheader("🗳️ Decisão da Turma")
-        escolha = st.text_input("Digite a opção escolhida ou a ação da turma:")
+        # Entrada para a decisão dos alunos
+        st.subheader("🗳️ O que a turma decide fazer?")
+        escolha = st.text_input("Digite o número da opção (ex: Opção 1) ou escreva uma ação personalizada:")
         
-        if st.button("Avançar História ➡️"):
+        if st.button("Enviar Resposta e Avançar ➡️", type="primary"):
             if escolha:
                 st.session_state.historico.append({"role": "aluno", "content": escolha})
-                st.session_state.imagem_atual = None  # Limpa a imagem anterior para a nova cena
+                st.session_state.imagem_atual = None
                 
-                # Monta o histórico completo para manter o contexto persistente
-                contexto_completo = f"Contexto original: {st.session_state.contexto}\n\nHistórico até agora:\n"
+                # Contexto acumulado
+                contexto_completo = f"Contexto original: {st.session_state.contexto}\n\nHistórico:\n"
                 for msg in st.session_state.historico:
                     contexto_completo += f"{msg['role']}: {msg['content']}\n"
                 
                 prompt_proximo = f"{contexto_completo}\n\nA turma escolheu: '{escolha}'. Continue a narrativa, forneça [CENA: ...] em inglês e 3 novas opções."
                 
-                with st.spinner("O Mestre está escrevendo a continuação..."):
+                with st.spinner("O Mestre está criando o próximo capítulo..."):
                     resposta = gerar_texto_gemini(prompt_proximo, gemini_key)
                     if resposta:
                         st.session_state.historico.append({"role": "mestre", "content": resposta})
                 st.rerun()
             else:
-                st.warning("Escreva uma opção antes de avançar!")
+                st.warning("Por favor, digite uma opção antes de avançar.")
