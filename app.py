@@ -39,7 +39,6 @@ with st.sidebar:
     st.divider()
     st.header("⚙️ Parâmetros da Partida")
     
-    # Se a partida já começou, travamos estes campos para evitar bugs de estado
     if not st.session_state.get("partida_iniciada", False):
         total_rodadas = st.slider("Duração (Número de Rodadas):", min_value=5, max_value=35, value=20)
         faixa_etaria = st.selectbox(
@@ -51,7 +50,7 @@ with st.sidebar:
     else:
         st.info(f"📌 **Rodadas totais:** {st.session_state.get('total_rodadas', 20)}")
         st.info(f"📌 **Faixa etária:** {st.session_state.get('faixa_etaria', 'Ensino Fundamental I')}")
-        st.info(f"📖 **Mundo Atual (Fixo):** {st.session_state.get('mundo_mestre', 'Indefinido')}")
+        st.info(f"📖 **Mundo Atual:** {st.session_state.get('mundo_mestre', 'Indefinido')}")
 
 # ---------------------------------------------------------------------------
 # 3. ESTADO DA SESSÃO (SESSION STATE)
@@ -81,6 +80,50 @@ def rolar_dado():
 
 def inicializar_cliente_gemini(key):
     return genai.Client(api_key=key)
+
+def obter_primeiro_nome(nome_completo):
+    return str(nome_completo).strip().split()[0]
+
+def renderizar_painel_jogadores():
+    """Exibe o painel de ícones e primeiro nome com status e itens"""
+    st.markdown("### 🛡️ Painel dos Heróis")
+    
+    # Criar colunas para os jogadores (até 6 por linha)
+    jogadores = st.session_state.jogadores
+    num_cols = min(len(jogadores), 6) if len(jogadores) > 0 else 1
+    cols = st.columns(num_cols)
+    
+    for idx, j in enumerate(jogadores):
+        col = cols[idx % num_cols]
+        primeiro_nome = obter_primeiro_nome(j["aluno"])
+        is_ativo = j["status"] == "VIVO"
+        status_icon = "🛡️" if is_ativo else "🧊"
+        status_texto = "Ativo" if is_ativo else "Congelado"
+        
+        # Verificar se é o aluno sorteado da rodada
+        is_sorteado = (
+            st.session_state.aluno_sorteado and 
+            st.session_state.aluno_sorteado["aluno"] == j["aluno"]
+        )
+        
+        # Montar os itens do inventário
+        itens = []
+        if j.get("tem_porcao_resgate"):
+            itens.append("🧪 Poção")
+        
+        txt_itens = " | ".join(itens) if itens else "Nenhum"
+        
+        with col:
+            # Destaque visual caso seja o sorteado
+            if is_sorteado:
+                st.markdown(f"⭐ **{status_icon} {primeiro_nome}**")
+            else:
+                st.markdown(f"**{status_icon} {primeiro_nome}**")
+            
+            st.caption(f"🎭 {j['personagem']}")
+            st.caption(f"Status: {status_texto}")
+            st.caption(f"🎒 {txt_itens}")
+            st.divider()
 
 def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False):
     client = inicializar_cliente_gemini(g_key)
@@ -206,7 +249,7 @@ if not st.session_state.partida_iniciada:
                     
                     st.session_state.jogadores = jogadores
                     
-                    # Sortear o Mundo Base ÚNICO para a história toda
+                    # Sortear o Mundo Base ÚNICO
                     livros_disponiveis = list(set([j["livro"] for j in jogadores]))
                     st.session_state.mundo_mestre = random.choice(livros_disponiveis)
 
@@ -249,17 +292,16 @@ else:
     if modo_visao == "📺 Tela da Turma (Projetor)":
         auto_refresh = st.checkbox("🔄 Atualização Automática da Projeção", value=True)
         
-        col_p1, col_p2, col_p3 = st.columns(3)
-        col_p1.metric("🌍 Mundo Principal", st.session_state.mundo_mestre)
-        col_p2.metric("⏳ Rodada", f"{st.session_state.rodada_atual} / {tot_rodadas}")
-        col_p3.metric("🛡️ Heróis Ativos", f"{len(vivos)} / {len(st.session_state.jogadores)}")
+        # PAINEL NOVO DE JOGADORES (Substituiu as métricas antigas)
+        renderizar_painel_jogadores()
 
         st.divider()
 
         # Destaque do Herói da Rodada
         if st.session_state.aluno_sorteado:
             h = st.session_state.aluno_sorteado
-            st.markdown(f"### ⭐ Herói em Ação: **{h['aluno']}** como *{h['personagem']}*")
+            p_nome = obter_primeiro_nome(h['aluno'])
+            st.markdown(f"### ⭐ Herói em Ação: **{p_nome}** como *{h['personagem']}*")
             st.info(f"✨ **Item Mágico:** {h['item']} | 🪄 **Habilidade:** {h['habilidade']} | 📖 **Livro da Ficha:** {h['livro']}")
 
         # Exibição da Última Cena da História
@@ -292,6 +334,9 @@ else:
     else:
         st.header("🕹️ Controle Exclusivo do Mestre")
         
+        # Exibe o painel de status também no controle do Mestre
+        renderizar_painel_jogadores()
+        
         if not is_ultima_rodada:
             col_m1, col_m2 = st.columns(2)
 
@@ -308,7 +353,7 @@ else:
                     "Aluno em ação:",
                     options=vivos,
                     index=vivos.index(st.session_state.aluno_sorteado) if st.session_state.aluno_sorteado in vivos else 0,
-                    format_func=lambda j: f"{j['aluno']} ({j['personagem']})"
+                    format_func=lambda j: f"{obter_primeiro_nome(j['aluno'])} ({j['personagem']})"
                 ) if vivos else None
 
                 if aluno_selecionado:
@@ -316,12 +361,12 @@ else:
 
                     # Ação de Resgate/Poção
                     if aluno_selecionado.get("tem_porcao_resgate") and congelados:
-                        st.warning(f"🧪 {aluno_selecionado['aluno']} tem uma Poção de Resgate!")
-                        aluno_salvar = st.selectbox("Descongelar colega:", options=congelados, format_func=lambda x: x["aluno"])
+                        st.warning(f"🧪 {obter_primeiro_nome(aluno_selecionado['aluno'])} tem uma Poção de Resgate!")
+                        aluno_salvar = st.selectbox("Descongelar colega:", options=congelados, format_func=lambda x: obter_primeiro_nome(x["aluno"]))
                         if st.button("Usar Poção de Resgate"):
                             aluno_salvar["status"] = "VIVO"
                             aluno_selecionado["tem_porcao_resgate"] = False
-                            st.success(f"{aluno_salvar['aluno']} voltou ao jogo!")
+                            st.success(f"{obter_primeiro_nome(aluno_salvar['aluno'])} voltou ao jogo!")
                             st.rerun()
 
             with col_m2:
@@ -350,20 +395,21 @@ else:
 
             st.divider()
 
-            # Botões de Decisão Final da Rodada (Avançam a história)
+            # Botões de Decisão Final da Rodada
             st.subheader("3. Decisão do Mestre & Avanço do Desafio")
             col_b1, col_b2 = st.columns(2)
 
             if aluno_selecionado and col_b1.button("✅ APROVAR SUCESSO (Avançar História)", type="primary", use_container_width=True):
+                # 30% de chance de ganhar item especial (Poção de Resgate)
                 if random.random() < 0.30:
                     aluno_selecionado["tem_porcao_resgate"] = True
-                    st.toast(f"✨ {aluno_selecionado['aluno']} ganhou uma Poção de Resgate!")
+                    st.toast(f"✨ {obter_primeiro_nome(aluno_selecionado['aluno'])} ganhou uma Poção de Resgate!")
 
-                # Contexto rico para garantir a continuidade da história no mundo fixo
+                p_nome = obter_primeiro_nome(aluno_selecionado['aluno'])
                 contexto = (
                     f"MUNDO BASE DA AVENTURA: '{st.session_state.mundo_mestre}'. "
                     f"RODADA ATUAL: {st.session_state.rodada_atual} de {tot_rodadas}. "
-                    f"AÇÃO: O herói {aluno_selecionado['personagem']} (aluno {aluno_selecionado['aluno']}) usou o item '{aluno_selecionado['item']}' "
+                    f"AÇÃO: O herói {aluno_selecionado['personagem']} (aluno {p_nome}) usou o item '{aluno_selecionado['item']}' "
                     f"e a habilidade '{aluno_selecionado['habilidade']}' (do livro {aluno_selecionado['livro']}) e VENCEU o obstáculo! "
                     f"INSTRUÇÃO IMPORTANTE: Narre esse sucesso com empolgação e em seguida APRESENTE O PRÓXIMO DESAFIO/OBSTÁCULO que surge para o grupo no mundo '{st.session_state.mundo_mestre}'."
                 )
@@ -385,10 +431,11 @@ else:
                     if j["aluno"] == aluno_selecionado["aluno"]:
                         j["status"] = "CONGELADO"
 
+                p_nome = obter_primeiro_nome(aluno_selecionado['aluno'])
                 contexto = (
                     f"MUNDO BASE DA AVENTURA: '{st.session_state.mundo_mestre}'. "
                     f"RODADA ATUAL: {st.session_state.rodada_atual} de {tot_rodadas}. "
-                    f"AÇÃO: O herói {aluno_selecionado['personagem']} FALHOU e foi congelado temporariamente. "
+                    f"AÇÃO: O herói {aluno_selecionado['personagem']} (aluno {p_nome}) FALHOU e foi congelado temporariamente. "
                     f"INSTRUÇÃO IMPORTANTE: Narre o congelamento sem violência e APRESENTE O NOVO DESAFIO que continua ameaçando a turma no mundo '{st.session_state.mundo_mestre}'."
                 )
 
