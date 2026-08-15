@@ -6,7 +6,8 @@ import pandas as pd
 import streamlit as st
 from google import genai
 from google.genai import types
-from huggingface_hub import InferenceClient
+from PIL import Image
+import io
 
 # ---------------------------------------------------------------------------
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -25,17 +26,14 @@ st.title("🎲 RPG Escolar: O Multiverso da Leitura")
 with st.sidebar:
     st.header("🔑 Configurações de API")
     gemini_key = st.secrets.get("GEMINI_API_KEY", "").strip()
-    hf_token = st.secrets.get("HF_TOKEN", "").strip()
 
     if not gemini_key:
-        gemini_key = st.text_input("Gemini API Key", type="password")
-    if not hf_token:
-        hf_token = st.text_input("Hugging Face Token", type="password")
+        gemini_key = st.text_input("Chave da API do Google Gemini", type="password")
 
-    if gemini_key and hf_token:
-        st.success("🟢 APIs Conectadas!")
+    if gemini_key:
+        st.success("🟢 API Conectada! (Texto e Imagem)")
     else:
-        st.warning("⚠️ Insira as chaves necessárias.")
+        st.warning("⚠️ Insira a chave do Gemini para jogar.")
 
     st.divider()
     st.header("⚙️ Parâmetros da Partida")
@@ -206,23 +204,13 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
 
     try:
         response = client.models.generate_content(
-            model='gemini-3.5-flash',
+            model='gemini-2.5-flash', # Ajustado para o modelo flash mais recente
             contents=prompt_contexto,
             config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
         )
         texto = response.text
     except Exception as e:
-        try:
-            st.toast("⚠️ Ajustando conexão da API! Acionando modelo alternativo...", icon="⚡")
-            time.sleep(2) 
-            response = client.models.generate_content(
-                model='gemini-3.5-flash-lite', 
-                contents=prompt_contexto,
-                config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
-            )
-            texto = response.text
-        except Exception as e_lite:
-            return f"Erro na narrativa: {e_lite}", f"epic scene, {estilo}"
+        return f"Erro na narrativa: {e}", f"epic scene, {estilo}"
 
     if "---" in texto:
         narrativa, prompt_img = texto.split("---", 1)
@@ -233,17 +221,28 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
     return narrativa.strip(), prompt_img.strip()
 
 # ===========================================================================
-# NOVA FUNÇÃO GERAR_IMAGEM COM TRAVA DE SEGURANÇA (st.stop)
+# NOVA FUNÇÃO GERAR_IMAGEM COM GOOGLE IMAGEN 3 (API GEMINI)
 # ===========================================================================
-def gerar_imagem(prompt_text, token):
+def gerar_imagem(prompt_text, chave_api):
     try:
-        client = InferenceClient(api_key=token)
-        image = client.text_to_image(prompt_text, model="stabilityai/stable-diffusion-xl-base-1.0")
-        return image
+        client = genai.Client(api_key=chave_api) 
+        
+        result = client.models.generate_images(
+            model='imagen-3.0-generate-001',
+            prompt=prompt_text,
+            config=types.GenerateImagesConfig(
+                number_of_images=1,
+                aspect_ratio="4:3",
+                output_mime_type="image/jpeg"
+            )
+        )
+        
+        imagem_bytes = result.generated_images[0].image.image_bytes
+        return Image.open(io.BytesIO(imagem_bytes))
+        
     except Exception as e:
-        # Mostra o erro e TRAVA o aplicativo para o st.rerun() não apagar a mensagem
-        st.error(f"🚨 **FALHA NO HUGGING FACE (GERAÇÃO DE IMAGEM)** 🚨\n\n**Motivo:** {e}")
-        st.stop() # Isso impede que a tela recarregue!
+        st.error(f"🚨 **FALHA NO GOOGLE IMAGEN** 🚨\n\n**Motivo:** {e}")
+        st.stop()
 # ===========================================================================
 
 def gerar_pergunta_livro(g_key, livro, faixa):
@@ -258,15 +257,10 @@ def gerar_pergunta_livro(g_key, livro, faixa):
     GABARITO: [Letra e Resposta Correta com explicação curta]
     """
     try:
-        response = client.models.generate_content(model='gemini-3.5-flash', contents=prompt)
+        response = client.models.generate_content(model='gemini-2.5-flash', contents=prompt)
         return response.text
-    except Exception:
-        try:
-            time.sleep(2)
-            response = client.models.generate_content(model='gemini-3.5-flash-lite', contents=prompt)
-            return response.text
-        except Exception as e_lite:
-            return f"Erro ao gerar pergunta: {e_lite}"
+    except Exception as e:
+        return f"Erro ao gerar pergunta: {e}"
 
 # ---------------------------------------------------------------------------
 # 5. TELA DE CARREGAMENTO (IMPORTAÇÃO DO CSV)
@@ -306,6 +300,10 @@ if not st.session_state.partida_iniciada:
                 st.dataframe(df, use_container_width=True)
                 
                 if st.button("🚀 Iniciar Aventura e Fixar Mundo!", type="primary"):
+                    if not gemini_key:
+                        st.error("⚠️ Insira a chave do Gemini na barra lateral primeiro!")
+                        st.stop()
+                        
                     jogadores = []
                     for _, row in df.iterrows():
                         jogadores.append({
@@ -334,7 +332,8 @@ if not st.session_state.partida_iniciada:
                             is_intro=True,
                             herois_vivos=vivos_agora
                         )
-                        img_intro = gerar_imagem(p_img, hf_token)
+                        # Chama a geração de imagem com a chave do Gemini
+                        img_intro = gerar_imagem(p_img, gemini_key)
 
                         st.session_state.historico.append({
                             "texto": narrativa_intro,
@@ -517,7 +516,8 @@ else:
                         herois_vivos=vivos, 
                         heroi_ativo=aluno_selecionado
                     )
-                    img = gerar_imagem(p_img, hf_token)
+                    # Chama a geração de imagem com a chave do Gemini
+                    img = gerar_imagem(p_img, gemini_key)
 
                     st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [SUCESSO] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Sucesso de {aluno_selecionado['personagem']}"})
@@ -554,7 +554,8 @@ else:
                         herois_vivos=vivos_restantes, 
                         heroi_ativo=aluno_selecionado
                     )
-                    img = gerar_imagem(p_img, hf_token)
+                    # Chama a geração de imagem com a chave do Gemini
+                    img = gerar_imagem(p_img, gemini_key)
 
                     st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [FALHA] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Falha de {aluno_selecionado['personagem']}"})
@@ -577,7 +578,8 @@ else:
                         is_final=True,
                         herois_vivos=vivos
                     )
-                    img_final = gerar_imagem(p_img, token=hf_token)
+                    # Chama a geração de imagem final com a chave do Gemini
+                    img_final = gerar_imagem(p_img, gemini_key)
 
                     st.session_state.historico.append({"texto": narrativa, "img": img_final, "heroi": "TODOS OS HERÓIS REUNIDOS"})
                     st.session_state.roteiro_hq.append(f"CENA FINAL: Vitória Épica. {narrativa}")
