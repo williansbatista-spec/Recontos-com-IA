@@ -157,12 +157,11 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False):
     
     REGRAS RÍGIDAS DE NARRATIVA:
     1. Jamais use termos de morte ou violência real. Alunos derrotados são apenas 'congelados', 'capturados' ou 'expulsos da área'.
-    2. CONTINUIDADE DA HISTÓRIA: Resolva o desafio atual da rodada E IMEDIATAMENTE apresente o novo obstáculo/desafio que a turma enfrentará no próximo passo!
-    3. Mantenha a ambientação estritamente ligada ao livro base do mundo: '{st.session_state.get('mundo_mestre', '')}'.
+    2. Mantenha a ambientação estritamente ligada ao livro base do mundo: '{st.session_state.get('mundo_mestre', '')}'.
     
     FORMATO DE RESPOSTA (ESTRITO):
     Responda ESTRITAMENTE em duas partes separadas por '---':
-    Parte 1: A narrativa da resolução + apresentação do novo desafio (até 2 parágrafos).
+    Parte 1: A narrativa da cena (até 2 parágrafos).
     Parte 2: O prompt em inglês detalhado e visual para a imagem da cena.
     """
     
@@ -273,14 +272,11 @@ if not st.session_state.partida_iniciada:
                     
                     st.session_state.jogadores = jogadores
                     
-                    # Sortear o Mundo Base ÚNICO
                     livros_disponiveis = list(set([j["livro"] for j in jogadores]))
                     st.session_state.mundo_mestre = random.choice(livros_disponiveis)
 
-                    # Sorteio inicial do primeiro jogador
                     sortear_proximo_aluno_automatico()
 
-                    # Gerar Prólogo / Introdução
                     with st.spinner(f"Criando o mundo de '{st.session_state.mundo_mestre}'..."):
                         narrativa_intro, p_img = gerar_narrativa_rpg(gemini_key, st.session_state.mundo_mestre, is_intro=True)
                         img_intro = gerar_imagem(p_img, False, hf_token)
@@ -319,17 +315,14 @@ else:
     if modo_visao == "📺 Tela da Turma (Projetor)":
         auto_refresh = st.checkbox("🔄 Atualização Automática da Projeção", value=True)
         
-        # Painel compacto em no máximo 2 linhas
         renderizar_painel_jogadores()
 
-        # Destaque do Herói da Rodada
         if st.session_state.aluno_sorteado and st.session_state.aluno_sorteado.get("presente", True):
             h = st.session_state.aluno_sorteado
             p_nome = obter_primeiro_nome(h['aluno'])
             st.markdown(f"### ⭐ Herói em Ação: **{p_nome}** como *{h['personagem']}*")
             st.info(f"✨ **Item Mágico:** {h['item']} | 🪄 **Habilidade:** {h['habilidade']} | 📖 **Livro da Ficha:** {h['livro']}")
 
-        # Exibição da Última Cena da História
         if st.session_state.historico:
             ultimo = st.session_state.historico[-1]
             st.subheader(f"🎬 {ultimo['heroi']}")
@@ -342,7 +335,6 @@ else:
                 st.markdown("### Narrativa Atual:")
                 st.write(ultimo["texto"])
 
-        # Linha do Tempo
         st.divider()
         st.subheader("📜 Cenas Anteriores")
         for item in reversed(st.session_state.historico[:-1]):
@@ -359,30 +351,33 @@ else:
     else:
         st.header("🕹️ Controle Exclusivo do Mestre")
         
-        # Gestão de Presença de Alunos
+        # --- EXIBE A HISTÓRIA ATUAL PARA O MESTRE ---
+        if st.session_state.historico:
+            with st.expander("📖 Leia a Situação Atual da História", expanded=True):
+                st.write(st.session_state.historico[-1]["texto"])
+        
+        # --- GESTÃO DE PRESENÇA (Com fix de chave única) ---
         with st.expander("📋 Chamada de Alunos (Marque/Desmarque Faltantes)"):
-            for j in st.session_state.jogadores:
+            for idx, j in enumerate(st.session_state.jogadores):
                 col_p1, col_p2 = st.columns([3, 1])
                 with col_p1:
                     st.write(f"**{j['aluno']}** ({j['personagem']})")
                 with col_p2:
-                    is_p = st.checkbox("Presente", value=j.get("presente", True), key=f"pres_{j['aluno']}")
+                    is_p = st.checkbox("Presente", value=j.get("presente", True), key=f"pres_{idx}_{j['aluno']}")
                     if is_p != j.get("presente", True):
                         j["presente"] = is_p
                         if not is_p and st.session_state.aluno_sorteado == j:
                             sortear_proximo_aluno_automatico()
                         st.rerun()
 
-        # Painel compacto em no máximo 2 linhas
         renderizar_painel_jogadores()
         
         if not is_ultima_rodada:
             col_m1, col_m2 = st.columns(2)
 
             with col_m1:
-                st.subheader("1. Herói da Rodada (Sorteio Automático)")
+                st.subheader("1. Herói da Rodada")
                 
-                # Se ainda não houver um sorteado, realiza o sorteio inicial
                 if not st.session_state.aluno_sorteado and vivos:
                     sortear_proximo_aluno_automatico()
 
@@ -396,7 +391,6 @@ else:
                 if aluno_selecionado:
                     st.session_state.aluno_sorteado = aluno_selecionado
 
-                    # Ação de Resgate/Poção
                     if aluno_selecionado.get("tem_porcao_resgate") and congelados:
                         st.warning(f"🧪 {obter_primeiro_nome(aluno_selecionado['aluno'])} tem uma Poção de Resgate!")
                         aluno_salvar = st.selectbox("Descongelar colega:", options=congelados, format_func=lambda x: obter_primeiro_nome(x["aluno"]))
@@ -406,7 +400,6 @@ else:
                             st.success(f"{obter_primeiro_nome(aluno_salvar['aluno'])} voltou ao jogo!")
                             st.rerun()
 
-                # Botão para trocar aluno manualmente se o Mestre precisar
                 if st.button("🔄 Resortear Aluno Manualmente"):
                     sortear_proximo_aluno_automatico(st.session_state.aluno_sorteado)
                     st.session_state.pergunta_atual = None
@@ -416,14 +409,12 @@ else:
             with col_m2:
                 st.subheader("2. Resolução do Desafio")
                 if st.session_state.aluno_sorteado:
-                    # Dado
                     if st.button("🎲 Rolar D20 (Sorte)"):
                         st.session_state["ultimo_dado"] = rolar_dado()
                     
                     if "ultimo_dado" in st.session_state:
                         st.write(f"Resultado do Dado: **{st.session_state['ultimo_dado']}**")
 
-                    # Pergunta baseada no livro do próprio aluno
                     if st.button("📖 Gerar Pergunta sobre o Livro do Aluno"):
                         with st.spinner("Gerando pergunta..."):
                             q = gerar_pergunta_livro(
@@ -434,12 +425,12 @@ else:
                             st.session_state.pergunta_atual = q
 
                     if st.session_state.pergunta_atual:
-                        st.warning("🔒 GABARITO DO MESTRE (Não mostrar aos alunos):")
+                        st.warning("🔒 GABARITO DO MESTRE:")
                         st.markdown(st.session_state.pergunta_atual)
 
             st.divider()
 
-            # Botões de Decisão Final da Rodada
+            # --- BOTÕES DE SUCESSO E FALHA COM MEMÓRIA DE CONTEXTO ---
             st.subheader("3. Decisão do Mestre & Avanço do Desafio")
             col_b1, col_b2 = st.columns(2)
 
@@ -449,12 +440,18 @@ else:
                     st.toast(f"✨ {obter_primeiro_nome(aluno_selecionado['aluno'])} ganhou uma Poção de Resgate!")
 
                 p_nome = obter_primeiro_nome(aluno_selecionado['aluno'])
+                
+                # Puxa o contexto da última cena (Amnésia da IA resolvida)
+                cena_anterior = st.session_state.historico[-1]['texto'] if st.session_state.historico else "Início da jornada."
+
                 contexto = (
-                    f"MUNDO BASE DA AVENTURA: '{st.session_state.mundo_mestre}'. "
+                    f"MUNDO BASE: '{st.session_state.mundo_mestre}'. "
                     f"RODADA ATUAL: {st.session_state.rodada_atual} de {tot_rodadas}. "
+                    f"CENA ANTERIOR: {cena_anterior} \n"
                     f"AÇÃO: O herói {aluno_selecionado['personagem']} (aluno {p_nome}) usou o item '{aluno_selecionado['item']}' "
-                    f"e a habilidade '{aluno_selecionado['habilidade']}' (do livro {aluno_selecionado['livro']}) e VENCEU o obstáculo! "
-                    f"INSTRUÇÃO IMPORTANTE: Narre esse sucesso com empolgação e em seguida APRESENTE O PRÓXIMO DESAFIO/OBSTÁCULO que surge para o grupo no mundo '{st.session_state.mundo_mestre}'."
+                    f"e a habilidade '{aluno_selecionado['habilidade']}' e VENCEU o obstáculo da cena anterior! \n"
+                    f"INSTRUÇÃO IMPORTANTE: Primeiro, narre brevemente como ele resolveu o obstáculo anterior. "
+                    f"EM SEGUIDA, a história avança: crie um PRÓXIMO DESAFIO/OBSTÁCULO totalmente novo que surge no caminho deles."
                 )
 
                 with st.spinner("NARRANDO SUCESSO E GERANDO PRÓXIMO DESAFIO..."):
@@ -468,7 +465,6 @@ else:
                     st.session_state.pergunta_atual = None
                     st.session_state.pop("ultimo_dado", None)
                     
-                    # SORTEIO AUTOMÁTICO DO PRÓXIMO ALUNO DA RODADA
                     sortear_proximo_aluno_automatico(aluno_selecionado)
                     st.rerun()
 
@@ -478,11 +474,16 @@ else:
                         j["status"] = "CONGELADO"
 
                 p_nome = obter_primeiro_nome(aluno_selecionado['aluno'])
+                
+                # Puxa o contexto da última cena (Amnésia da IA resolvida)
+                cena_anterior = st.session_state.historico[-1]['texto'] if st.session_state.historico else "Início da jornada."
+
                 contexto = (
-                    f"MUNDO BASE DA AVENTURA: '{st.session_state.mundo_mestre}'. "
+                    f"MUNDO BASE: '{st.session_state.mundo_mestre}'. "
                     f"RODADA ATUAL: {st.session_state.rodada_atual} de {tot_rodadas}. "
-                    f"AÇÃO: O herói {aluno_selecionado['personagem']} (aluno {p_nome}) FALHOU e foi congelado temporariamente. "
-                    f"INSTRUÇÃO IMPORTANTE: Narre o congelamento sem violência e APRESENTE O NOVO DESAFIO que continua ameaçando a turma no mundo '{st.session_state.mundo_mestre}'."
+                    f"CENA ANTERIOR: {cena_anterior} \n"
+                    f"AÇÃO: O herói {aluno_selecionado['personagem']} (aluno {p_nome}) FALHOU ao tentar superar o obstáculo e foi congelado temporariamente (narrativa sem violência). \n"
+                    f"INSTRUÇÃO IMPORTANTE: Primeiro, narre a falha e o congelamento. EM SEGUIDA, aplique a regra do 'Fail Forward' (fracassar para frente): a história não para, a falha causa uma complicação nova ou o obstáculo evolui para um cenário pior, exigindo ação imediata do próximo herói."
                 )
 
                 with st.spinner("REGISTRANDO FALHA E GERANDO PRÓXIMO DESAFIO..."):
@@ -496,7 +497,6 @@ else:
                     st.session_state.pergunta_atual = None
                     st.session_state.pop("ultimo_dado", None)
                     
-                    # SORTEIO AUTOMÁTICO DO PRÓXIMO ALUNO DA RODADA
                     sortear_proximo_aluno_automatico(aluno_selecionado)
                     st.rerun()
 
@@ -512,7 +512,6 @@ else:
                     st.session_state.roteiro_hq.append(f"CENA FINAL: Vitória Épica. {narrativa}")
                     st.rerun()
 
-        # Baixar Roteiro
         st.divider()
         texto_roteiro = "\n\n".join(st.session_state.roteiro_hq)
         st.download_button(
