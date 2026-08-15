@@ -128,11 +128,11 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
     max_tentativas = 3
     for tentativa in range(max_tentativas):
         try:
-            # Nova chamada utilizando a Interactions API
-            response = client.interactions.create(
-                model="gemini-2.5-flash",
-                config={"system_instruction": system_instruction},
-                contents=f"Ação/Contexto: {prompt_usuario}"
+            # MÉTODO CORRETO E MODELO EXISTENTE (2.0-flash) COM O CONFIG
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=f"Ação/Contexto: {prompt_usuario}",
+                config={"system_instruction": system_instruction}
             )
             
             texto = response.text
