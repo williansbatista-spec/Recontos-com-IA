@@ -11,13 +11,13 @@ from huggingface_hub import InferenceClient
 # 1. CONFIGURAÇÃO DA PÁGINA
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Os Mestre de Aventura",
+    page_title="RPG Escolar - Mestre de Aventura",
     page_icon="🎲",
     layout="wide"
 )
 
-st.title("🎲 No Multiverso da Leitura")
-st.caption("Aventura Interativa Pelo Fantástico Mundo da Literatura")
+st.title("🎲 RPG Escolar: O Multiverso da Leitura")
+st.caption("Aventura Interativa Pedagógica com Registro de Roteiro para HQ/Vídeo")
 
 # ---------------------------------------------------------------------------
 # 2. BARRA LATERAL: API & CONFIGURAÇÕES
@@ -60,8 +60,6 @@ if "historico" not in st.session_state:
     st.session_state.historico = []
 if "roteiro_hq" not in st.session_state:
     st.session_state.roteiro_hq = []
-if "aluno_da_vez" not in st.session_state:
-    st.session_state.aluno_da_vez = None
 
 # ---------------------------------------------------------------------------
 # 4. FUNÇÕES AUXILIARES & IA
@@ -131,33 +129,61 @@ def gerar_pergunta_livro(g_key, livro, faixa):
 if not st.session_state.partida_iniciada:
     st.header("📂 1. Carregar Ficha da Turma (CSV)")
     st.markdown("""
-    Envie um arquivo CSV com o cabeçalho: `Nome do Aluno`, `Livro Lido`, `Nome do Personagem`, `Habilidade`, `Item Mágico`.
+    Envie um arquivo CSV contendo as colunas: **Nome do Aluno**, **Livro Lido**, **Nome do Personagem**, **Habilidade**, **Item Mágico**.
     """)
     
     csv_file = st.file_uploader("Escolha o arquivo CSV", type=["csv"])
     
     if csv_file:
-        df = pd.read_csv(csv_file)
-        st.dataframe(df.head(), use_container_width=True)
-        
-        if st.button("🚀 Iniciar Aventura!", type="primary"):
-            jogadores = []
-            for _, row in df.iterrows():
-                jogadores.append({
-                    "aluno": str(row["Nome do Aluno"]),
-                    "livro": str(row["Livro Lido"]),
-                    "personagem": str(row["Nome do Personagem"]),
-                    "habilidade": str(row["Habilidade"]),
-                    "item": str(row["Item Mágico"]),
-                    "status": "VIVO",
-                    "item_resgate": False
-                })
+        try:
+            # Tenta ler com vírgula; se falhar, tenta com ponto e vírgula
+            try:
+                df = pd.read_csv(csv_file)
+                if len(df.columns) <= 1:
+                    csv_file.seek(0)
+                    df = pd.read_csv(csv_file, sep=';')
+            except Exception:
+                csv_file.seek(0)
+                df = pd.read_csv(csv_file, sep=';')
+
+            # Limpa espaços invisíveis nos cabeçalhos
+            df.columns = df.columns.str.strip()
+
+            st.dataframe(df.head(), use_container_width=True)
             
-            st.session_state.jogadores = jogadores
-            livros_disponiveis = list(set([j["livro"] for j in jogadores]))
-            st.session_state.mundo_mestre = random.choice(livros_disponiveis)
-            st.session_state.partida_iniciada = True
-            st.rerun()
+            # Mapeamento flexível de colunas
+            col_map = {col.lower(): col for col in df.columns}
+            
+            c_aluno = col_map.get("nome do aluno") or col_map.get("aluno") or col_map.get("nome")
+            c_livro = col_map.get("livro lido") or col_map.get("livro")
+            c_personagem = col_map.get("nome do personagem") or col_map.get("personagem")
+            c_habilidade = col_map.get("habilidade")
+            c_item = col_map.get("item mágico") or col_map.get("item magico") or col_map.get("item")
+
+            if not all([c_aluno, c_livro, c_personagem, c_habilidade, c_item]):
+                st.error("⚠️ Não encontramos todas as colunas necessárias! Certifique-se de que seu arquivo possui: 'Nome do Aluno', 'Livro Lido', 'Nome do Personagem', 'Habilidade' e 'Item Mágico'.")
+            else:
+                if st.button("🚀 Iniciar Aventura!", type="primary"):
+                    jogadores = []
+                    for _, row in df.iterrows():
+                        jogadores.append({
+                            "aluno": str(row[c_aluno]),
+                            "livro": str(row[c_livro]),
+                            "personagem": str(row[c_personagem]),
+                            "habilidade": str(row[c_habilidade]),
+                            "item": str(row[c_item]),
+                            "status": "VIVO",
+                            "item_resgate": False
+                        })
+                    
+                    st.session_state.jogadores = jogadores
+                    livros_disponiveis = list(set([j["livro"] for j in jogadores]))
+                    st.session_state.mundo_mestre = random.choice(livros_disponiveis)
+                    st.session_state.partida_iniciada = True
+                    st.rerun()
+
+        except Exception as e:
+            st.error(f"Erro ao processar o arquivo CSV: {e}")
 
 # ---------------------------------------------------------------------------
 # 6. PAINEL DO JOGO (PARTIDA ATIVA)
@@ -165,8 +191,8 @@ if not st.session_state.partida_iniciada:
 else:
     # Cabeçalho de Status
     c_head1, c_head2, c_head3 = st.columns(3)
-    c_head1.metric("Mundo Mestre", st.session_state.mundo_mestre)
-    c_head2.metric("Rodada", f"{st.session_state.rodada_atual} / {total_rodadas}")
+    c_head1.metric("Mundo Mestre Sorteado", st.session_state.mundo_mestre)
+    c_head2.metric("Rodada Atual", f"{st.session_state.rodada_atual} / {total_rodadas}")
     
     vivos = sum(1 for j in st.session_state.jogadores if j["status"] == "VIVO")
     c_head3.metric("Alunos Ativos", f"{vivos} / {len(st.session_state.jogadores)}")
@@ -231,7 +257,6 @@ else:
                     narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto)
                     img = gerar_imagem(p_img, False, hf_token)
                     
-                    # Salva no Roteiro
                     st.session_state.roteiro_hq.append(f"CENA {st.session_state.rodada_atual}: [SUCESSO] Herói {aluno_selecionado['personagem']} usa {aluno_selecionado['item']}. Narrativa: {narrativa}")
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": aluno_selecionado["personagem"]})
                     
@@ -239,7 +264,6 @@ else:
                     st.rerun()
 
             if c_res2.button("❌ O Aluno FALHOU!", use_container_width=True):
-                # Marca aluno como congelado
                 for j in st.session_state.jogadores:
                     if j["aluno"] == aluno_selecionado["aluno"]:
                         j["status"] = "CONGELADO"
@@ -281,7 +305,6 @@ else:
     st.divider()
     st.subheader("📖 Linha do Tempo e Roteiro da Aula")
     
-    # Botão para baixar o roteiro completo
     texto_roteiro = "\n\n".join(st.session_state.roteiro_hq)
     st.download_button(
         label="📥 Baixar Roteiro para HQ / Vídeo (TXT)",
