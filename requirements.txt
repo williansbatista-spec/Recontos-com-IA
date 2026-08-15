@@ -1,4 +1,4 @@
-google-generativeai
+google-genai
 streamlit
 huggingface_hub
 pillow
