@@ -1,4 +1,5 @@
-google-genai
 streamlit
-huggingface_hub
-pillow
+pandas
+Pillow
+requests
+google-genai
