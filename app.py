@@ -8,6 +8,8 @@ from google import genai
 from google.genai import types
 from PIL import Image
 import io
+import requests
+import base64
 
 # ---------------------------------------------------------------------------
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -21,23 +23,24 @@ st.set_page_config(
 st.title("🎲 RPG Escolar: O Multiverso da Leitura")
 
 # ---------------------------------------------------------------------------
-# 2. BARRA LATERAL: API & CONFIGURAÇÕES
+# 2. BARRA LATERAL: CONFIGURAÇÕES E SECRETS
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.header("🔑 Configurações de API")
-    gemini_key = st.secrets.get("GEMINI_API_KEY", "").strip()
-
-    if not gemini_key:
-        gemini_key = st.text_input("Chave da API do Google Gemini", type="password")
-
-    if gemini_key:
-        st.success("🟢 API Conectada! (Texto e Imagem)")
-    else:
-        st.warning("⚠️ Insira a chave do Gemini para jogar.")
-
-    st.divider()
     st.header("⚙️ Parâmetros da Partida")
     
+    # 1. Puxando as chaves do arquivo secrets.toml de forma invisível
+    gemini_key = st.secrets.get("GEMINI_API_KEY", "").strip()
+    together_key = st.secrets.get("TOGETHER_API_KEY", "").strip()
+
+    # 2. Trava de segurança
+    if not gemini_key or not together_key:
+        st.error("⚠️ Chaves de API não encontradas nas variáveis de ambiente (secrets)!")
+        st.stop()
+    else:
+        st.success("🟢 APIs Conectadas! (Gemini & Together AI)")
+    
+    st.divider()
+
     if not st.session_state.get("partida_iniciada", False):
         total_rodadas = st.slider("Duração (Número de Rodadas):", min_value=5, max_value=35, value=20)
         faixa_etaria = st.selectbox(
@@ -204,7 +207,7 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.5-flash', # Ajustado para o modelo flash mais recente
+            model='gemini-2.5-flash',
             contents=prompt_contexto,
             config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
         )
@@ -221,29 +224,49 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
     return narrativa.strip(), prompt_img.strip()
 
 # ===========================================================================
-# NOVA FUNÇÃO GERAR_IMAGEM COM GOOGLE IMAGEN 3 (API GEMINI)
+# NOVA FUNÇÃO GERAR_IMAGEM COM TOGETHER AI (FLUX / SDXL)
 # ===========================================================================
 def gerar_imagem(prompt_text, chave_api):
+    if not chave_api:
+        st.toast("⚠️ Imagem pulada: Chave da API ausente.", icon="🚫")
+        return None
+
+    url = "https://api.together.xyz/v1/images/generations"
+    headers = {
+        "Authorization": f"Bearer {chave_api}",
+        "Content-Type": "application/json"
+    }
+
+    payload = {
+        "model": "black-forest-labs/FLUX.1-schnell", 
+        "prompt": prompt_text,
+        "width": 1024,
+        "height": 768,
+        "steps": 4,
+        "n": 1
+    }
+
     try:
-        client = genai.Client(api_key=chave_api) 
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
         
-        result = client.models.generate_images(
-            model='imagen-4.0-generate-001',
-            prompt=prompt_text,
-            config=types.GenerateImagesConfig(
-                number_of_images=1,
-                aspect_ratio="4:3",
-                output_mime_type="image/jpeg"
-            )
-        )
-        
-        imagem_bytes = result.generated_images[0].image.image_bytes
-        return Image.open(io.BytesIO(imagem_bytes))
-        
+        if response.status_code == 200:
+            data = response.json()
+            if "data" in data and len(data["data"]) > 0:
+                item = data["data"][0]
+                if "url" in item:
+                    img_res = requests.get(item["url"])
+                    return Image.open(io.BytesIO(img_res.content))
+                elif "b64_json" in item:
+                    return Image.open(io.BytesIO(base64.b64decode(item["b64_json"])))
+                    
+        print(f"Erro Together API: {response.status_code} - {response.text}")
+        st.toast(f"⚠️ Erro ao gerar imagem (Status {response.status_code}).", icon="🚫")
+        return None
+
     except Exception as e:
-        st.error(f"🚨 **FALHA NO GOOGLE IMAGEN** 🚨\n\n**Motivo:** {e}")
-        st.stop()
-# ===========================================================================
+        print(f"Exceção na chamada da imagem: {e}")
+        st.toast("⚠️ Falha na conexão com o serviço de imagem.", icon="🚫")
+        return None
 
 def gerar_pergunta_livro(g_key, livro, faixa):
     client = inicializar_cliente_gemini(g_key)
@@ -300,10 +323,6 @@ if not st.session_state.partida_iniciada:
                 st.dataframe(df, use_container_width=True)
                 
                 if st.button("🚀 Iniciar Aventura e Fixar Mundo!", type="primary"):
-                    if not gemini_key:
-                        st.error("⚠️ Insira a chave do Gemini na barra lateral primeiro!")
-                        st.stop()
-                        
                     jogadores = []
                     for _, row in df.iterrows():
                         jogadores.append({
@@ -332,8 +351,8 @@ if not st.session_state.partida_iniciada:
                             is_intro=True,
                             herois_vivos=vivos_agora
                         )
-                        # Chama a geração de imagem com a chave do Gemini
-                        img_intro = gerar_imagem(p_img, gemini_key)
+                        # Chama a geração de imagem com a chave do Together AI
+                        img_intro = gerar_imagem(p_img, together_key)
 
                         st.session_state.historico.append({
                             "texto": narrativa_intro,
@@ -516,8 +535,8 @@ else:
                         herois_vivos=vivos, 
                         heroi_ativo=aluno_selecionado
                     )
-                    # Chama a geração de imagem com a chave do Gemini
-                    img = gerar_imagem(p_img, gemini_key)
+                    # Chama a geração de imagem com a chave do Together AI
+                    img = gerar_imagem(p_img, together_key)
 
                     st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [SUCESSO] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Sucesso de {aluno_selecionado['personagem']}"})
@@ -554,8 +573,8 @@ else:
                         herois_vivos=vivos_restantes, 
                         heroi_ativo=aluno_selecionado
                     )
-                    # Chama a geração de imagem com a chave do Gemini
-                    img = gerar_imagem(p_img, gemini_key)
+                    # Chama a geração de imagem com a chave do Together AI
+                    img = gerar_imagem(p_img, together_key)
 
                     st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [FALHA] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Falha de {aluno_selecionado['personagem']}"})
@@ -578,8 +597,8 @@ else:
                         is_final=True,
                         herois_vivos=vivos
                     )
-                    # Chama a geração de imagem final com a chave do Gemini
-                    img_final = gerar_imagem(p_img, gemini_key)
+                    # Chama a geração de imagem final com a chave do Together AI
+                    img_final = gerar_imagem(p_img, together_key)
 
                     st.session_state.historico.append({"texto": narrativa, "img": img_final, "heroi": "TODOS OS HERÓIS REUNIDOS"})
                     st.session_state.roteiro_hq.append(f"CENA FINAL: Vitória Épica. {narrativa}")
