@@ -52,6 +52,17 @@ with st.sidebar:
         
     if gemini_key and hf_token:
         st.success("🟢 Chaves de API Ativas!")
+        if gemini_key and hf_token:
+        st.success("🟢 Chaves de API Ativas!")
+        
+        # --- NOVO BLOCO DETETIVE ---
+        try:
+            genai.configure(api_key=gemini_key)
+            modelos_permitidos = [m.name.replace('models/', '') for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+            st.caption(f"🤖 **Modelos liberados para a sua chave:** \n{', '.join(modelos_permitidos)}")
+        except Exception:
+            pass
+        # ---------------------------
     else:
         st.warning("⚠️ Insira as chaves nos Secrets ou nos campos acima.")
     
