@@ -12,12 +12,12 @@ from huggingface_hub import InferenceClient
 # 1. CONFIGURAÇÃO DA PÁGINA
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="Multiverso da Leitura",
+    page_title="RPG Escolar - Multiverso da Leitura",
     page_icon="🎲",
     layout="wide"
 )
 
-st.title("🎲 No Multiverso da Leitura")
+st.title("🎲 RPG Escolar: O Multiverso da Leitura")
 
 # ---------------------------------------------------------------------------
 # 2. BARRA LATERAL: API & CONFIGURAÇÕES
@@ -47,7 +47,6 @@ with st.sidebar:
             ["Ensino Fundamental I (1º ao 3º ano)", "Ensino Fundamental I (4º e 5º ano)", "Ensino Fundamental II"]
         )
         
-        # --- NOVO: SELETOR DE ESTILO VISUAL FLUX ---
         estilo_arte = st.selectbox(
             "🎨 Estilo Visual das Imagens:",
             [
@@ -70,7 +69,6 @@ with st.sidebar:
 
         st.divider()
         
-        # Botão para resetar o jogo sem perder as chaves de API
         if st.button("🗑️ Encerrar e Reiniciar Jogo", type="primary", use_container_width=True):
             chaves_para_limpar = [
                 "partida_iniciada", "jogadores", "mundo_mestre", 
@@ -174,7 +172,6 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
     faixa = st.session_state.get("faixa_etaria", "Ensino Fundamental I")
     estilo = st.session_state.get("estilo_arte", "vibrant children storybook style")
     
-    # Monta a string dos observadores para orientar a IA visual
     lista_observadores = ""
     if herois_vivos:
         nomes = [h['personagem'] for h in herois_vivos if h != heroi_ativo]
@@ -209,7 +206,7 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
 
     try:
         response = client.models.generate_content(
-            model='gemini-3.5-flash',
+            model='gemini-2.0-flash',
             contents=prompt_contexto,
             config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
         )
@@ -219,7 +216,7 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
             st.toast("⚠️ Ajustando conexão da API! Acionando modelo alternativo...", icon="⚡")
             time.sleep(2) 
             response = client.models.generate_content(
-                model='gemini-3.5-flash-lite', 
+                model='gemini-1.5-flash-8b', 
                 contents=prompt_contexto,
                 config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
             )
@@ -235,14 +232,15 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
     
     return narrativa.strip(), prompt_img.strip()
 
+# AQUI ESTÁ A FUNÇÃO CORRIGIDA PARA EXIBIR OS ERROS DO HUGGING FACE!
 def gerar_imagem(prompt_text, token):
-    # O LLM agora constrói o prompt inteiro (estilo, ação e fundo), não precisamos mais concatenar manualmente
     try:
         client = InferenceClient(api_key=token)
         image = client.text_to_image(prompt_text, model="black-forest-labs/FLUX.1-schnell")
         return image
     except Exception as e:
-    st.error(f"⚠️ Erro no Hugging Face: {e}")
+        # A mensagem vermelha de erro aparecerá na tela sem derrubar o app
+        st.error(f"⚠️ Erro no Hugging Face (Falha ao gerar imagem): {e}")
         return None
 
 def gerar_pergunta_livro(g_key, livro, faixa):
@@ -389,6 +387,8 @@ else:
             with c_img:
                 if ultimo["img"]:
                     st.image(ultimo["img"], use_container_width=True)
+                else:
+                    st.warning("Imagem indisponível para esta cena.")
             with c_txt:
                 st.markdown("### Narrativa Atual:")
                 st.write(ultimo["texto"])
@@ -542,7 +542,6 @@ else:
                     f"INSTRUÇÃO IMPORTANTE: Primeiro, narre a falha e o congelamento. EM SEGUIDA, aplique o 'Fail Forward': a falha causa uma complicação nova ou o obstáculo evolui para um cenário pior, exigindo ação imediata do próximo herói."
                 )
 
-                # Removemos o recém congelado da foto do fundo para manter a lógica
                 vivos_restantes = [v for v in vivos if v['aluno'] != aluno_selecionado['aluno']]
 
                 with st.spinner("REGISTRANDO FALHA E GERANDO PRÓXIMO DESAFIO..."):
