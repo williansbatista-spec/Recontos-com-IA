@@ -205,7 +205,6 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
         prompt_contexto += " ESTA É A RODADA FINAL! Narre a grande vitória vitoriosa e épica da turma contra o desafio principal."
 
     try:
-        # ATUALIZADO PARA 3.5 FLASH
         response = client.models.generate_content(
             model='gemini-3.5-flash',
             contents=prompt_contexto,
@@ -216,7 +215,6 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
         try:
             st.toast("⚠️ Ajustando conexão da API! Acionando modelo alternativo...", icon="⚡")
             time.sleep(2) 
-            # ATUALIZADO PARA 3.5 FLASH LITE
             response = client.models.generate_content(
                 model='gemini-3.5-flash-lite', 
                 contents=prompt_contexto,
@@ -234,9 +232,8 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
     
     return narrativa.strip(), prompt_img.strip()
 
-
 # ===========================================================================
-# 👇 AQUI ESTÁ A FUNÇÃO ATUALIZADA (O ERRO VAI APARECER NA TELA) 👇
+# NOVA FUNÇÃO GERAR_IMAGEM COM TRAVA DE SEGURANÇA (st.stop)
 # ===========================================================================
 def gerar_imagem(prompt_text, token):
     try:
@@ -244,11 +241,10 @@ def gerar_imagem(prompt_text, token):
         image = client.text_to_image(prompt_text, model="black-forest-labs/FLUX.1-schnell")
         return image
     except Exception as e:
-        # Se falhar, mostra o erro direto na interface do Streamlit para descobrirmos o motivo
+        # Mostra o erro e TRAVA o aplicativo para o st.rerun() não apagar a mensagem
         st.error(f"🚨 **FALHA NO HUGGING FACE (GERAÇÃO DE IMAGEM)** 🚨\n\n**Motivo:** {e}")
-        return None
+        st.stop() # Isso impede que a tela recarregue!
 # ===========================================================================
-
 
 def gerar_pergunta_livro(g_key, livro, faixa):
     client = inicializar_cliente_gemini(g_key)
@@ -262,13 +258,11 @@ def gerar_pergunta_livro(g_key, livro, faixa):
     GABARITO: [Letra e Resposta Correta com explicação curta]
     """
     try:
-        # ATUALIZADO PARA 3.5 FLASH
         response = client.models.generate_content(model='gemini-3.5-flash', contents=prompt)
         return response.text
     except Exception:
         try:
             time.sleep(2)
-            # ATUALIZADO PARA 3.5 FLASH LITE
             response = client.models.generate_content(model='gemini-3.5-flash-lite', contents=prompt)
             return response.text
         except Exception as e_lite:
