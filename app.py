@@ -193,7 +193,7 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False):
             st.toast("⚠️ Pico de acesso na API! Acionando o backup de estabilidade...", icon="⚡")
             time.sleep(2) # Pequena pausa para a API respirar
             response = client.models.generate_content(
-                model='gemini-1.5-flash', # Trocado para o 1.5 Flash (mais estável)
+                model='gemini-3.5-flash-lite', # Trocado para o 3.5 Flash-lite (mais estável)
                 contents=prompt_contexto,
                 config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
             )
