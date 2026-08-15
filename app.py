@@ -2,7 +2,7 @@ import os
 import random
 import time
 import streamlit as st
-import google.generativeai as genai  # <-- IMPORTAÇÃO CLÁSSICA
+import google.generativeai as genai
 from huggingface_hub import InferenceClient
 
 # ---------------------------------------------------------------------------
@@ -53,19 +53,17 @@ with st.sidebar:
     if gemini_key and hf_token:
         st.success("🟢 Chaves de API Ativas!")
         
-        # --- BLOCO DETETIVE DE MODELOS CORPORATIVOS ---
         try:
             genai.configure(api_key=gemini_key)
             modelos_permitidos = [m.name.replace('models/', '') for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            
-            with st.expander("🤖 Ver Modelos Liberados", expanded=True):
+            with st.expander("🤖 Ver Modelos Liberados", expanded=False):
                 if modelos_permitidos:
                     st.write(", ".join(modelos_permitidos))
                 else:
                     st.warning("Nenhum modelo compatível encontrado para esta chave.")
         except Exception as e:
             st.error(f"Erro ao listar modelos: {e}")
-        # ----------------------------------------------
+            
     else:
         st.warning("⚠️ Insira as chaves nos Secrets ou nos campos acima.")
     
@@ -125,9 +123,7 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
     
     system_instruction = f"""
     Você é o Mestre de um RPG pedagógico infantil.
-    
-    DIRETRIZ DE PÚBLICO-ALVO:
-    {orientacao_idade}
+    DIRETRIZ DE PÚBLICO-ALVO: {orientacao_idade}
     
     Responda em duas partes estritamente divididas por '---':
     Parte 1: A narrativa da história em até 2 parágrafos curtos. Termine SEMPRE com 2 opções bem claras numeradas para os alunos escolherem:
@@ -142,9 +138,9 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
     max_tentativas = 3
     for tentativa in range(max_tentativas):
         try:
-            # TENTA PRIMEIRO O MODELO PRO MAIS RECENTE
+            # USANDO O MODELO ESTÁVEL PRESENTE NA SUA CHAVE CORPORATIVA
             model = genai.GenerativeModel(
-                model_name="gemini-1.5-pro-latest",
+                model_name="gemini-2.5-flash",
                 system_instruction=system_instruction
             )
             
@@ -160,21 +156,7 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
             return narrativa.strip(), prompt_img.strip()
 
         except Exception as e:
-            # SE O MODELO ACIMA FALHAR, TENTA O GEMINI-PRO CLÁSSICO COMO PLANO B
-            if "NOT_FOUND" in str(e):
-                model = genai.GenerativeModel(model_name="gemini-pro")
-                # No gemini-pro clássico, mandamos a instrução junto no prompt
-                response = model.generate_content(f"{system_instruction}\n\nAção/Contexto: {prompt_usuario}")
-                
-                texto = response.text
-                if "---" in texto:
-                    narrativa, prompt_img = texto.split("---", 1)
-                else:
-                    narrativa = texto
-                    prompt_img = f"{estilo_prefixo}: storybook magical scene"
-                return narrativa.strip(), prompt_img.strip()
-                
-            # Trata erro de limite de cota (429)
+            # Trata erro de limite de cota (429) e tenta novamente após 10s
             if ("429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)) and tentativa < max_tentativas - 1:
                 time.sleep(10)
                 continue
@@ -214,7 +196,6 @@ def executar_rodada(acao_texto: str):
             )
             img_gerada = gerar_imagem_hf(prompt_img, prompt_estilo_base, hf_token.strip())
             
-            # Salva a nova rodada no histórico
             st.session_state.historico.append({
                 "acao": acao_texto,
                 "narrativa": narrativa,
@@ -223,7 +204,6 @@ def executar_rodada(acao_texto: str):
                 "faixa": faixa_selecionada
             })
             
-            # Reseta o placar de votos para a nova etapa
             st.session_state.votos_op1 = 0
             st.session_state.votos_op2 = 0
             
@@ -236,7 +216,6 @@ def executar_rodada(acao_texto: str):
 # 6. PAINEL PRINCIPAL: JOGO & VOTAÇÃO
 # ---------------------------------------------------------------------------
 
-# CASO 1: AINDA NÃO HÁ HISTÓRICO (INÍCIO DO JOGO)
 if not st.session_state.historico:
     st.info("👋 **Bem-vindo ao RPG Escolar!** Digite abaixo o tema ou o começo da história para iniciar a aventura.")
     
@@ -253,9 +232,7 @@ if not st.session_state.historico:
             else:
                 executar_rodada(contexto_inicial)
 
-# CASO 2: O JOGO JÁ COMEÇOU (SISTEMA DE VOTAÇÃO ATIVO)
 else:
-    # Recupera as opções da ÚLTIMA narrativa do histórico
     ultima_narrativa = st.session_state.historico[-1]["narrativa"]
     op1_texto, op2_texto = extrair_opcoes(ultima_narrativa)
 
@@ -279,7 +256,6 @@ else:
 
     st.divider()
 
-    # Botões de Ação da Votação
     col_enviar, col_limpar = st.columns([3, 1])
 
     with col_enviar:
@@ -302,7 +278,6 @@ else:
             st.session_state.votos_op2 = 0
             st.rerun()
 
-    # Opção alternativa para o professor digitar uma ação livre
     with st.expander("✍️ Ou digite uma ação personalizada (Ação Livre)"):
         with st.form("form_livre"):
             acao_custom = st.text_input("Ação customizada da turma:")
