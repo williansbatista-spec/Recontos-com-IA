@@ -241,7 +241,8 @@ def gerar_imagem(prompt_text, token):
         client = InferenceClient(api_key=token)
         image = client.text_to_image(prompt_text, model="black-forest-labs/FLUX.1-schnell")
         return image
-    except Exception:
+    except Exception as e:
+    st.error(f"⚠️ Erro no Hugging Face: {e}")
         return None
 
 def gerar_pergunta_livro(g_key, livro, faixa):
