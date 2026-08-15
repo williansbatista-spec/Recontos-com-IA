@@ -238,7 +238,7 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
 def gerar_imagem(prompt_text, token):
     try:
         client = InferenceClient(api_key=token)
-        image = client.text_to_image(prompt_text, model="black-forest-labs/FLUX.1-schnell")
+        image = client.text_to_image(prompt_text, model="stabilityai/stable-diffusion-xl-base-1.0")
         return image
     except Exception as e:
         # Mostra o erro e TRAVA o aplicativo para o st.rerun() não apagar a mensagem
