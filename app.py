@@ -205,6 +205,7 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
         prompt_contexto += " ESTA É A RODADA FINAL! Narre a grande vitória vitoriosa e épica da turma contra o desafio principal."
 
     try:
+        # ATUALIZADO PARA 3.5 FLASH
         response = client.models.generate_content(
             model='gemini-3.5-flash',
             contents=prompt_contexto,
@@ -215,6 +216,7 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
         try:
             st.toast("⚠️ Ajustando conexão da API! Acionando modelo alternativo...", icon="⚡")
             time.sleep(2) 
+            # ATUALIZADO PARA 3.5 FLASH LITE
             response = client.models.generate_content(
                 model='gemini-3.5-flash-lite', 
                 contents=prompt_contexto,
@@ -232,15 +234,17 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
     
     return narrativa.strip(), prompt_img.strip()
 
-# AQUI ESTÁ A FUNÇÃO CORRIGIDA PARA EXIBIR OS ERROS DO HUGGING FACE!
 def gerar_imagem(prompt_text, token):
     try:
         client = InferenceClient(api_key=token)
         image = client.text_to_image(prompt_text, model="black-forest-labs/FLUX.1-schnell")
         return image
     except Exception as e:
-        # A mensagem vermelha de erro aparecerá na tela sem derrubar o app
-        st.error(f"⚠️ Erro no Hugging Face (Falha ao gerar imagem): {e}")
+        # O ERRO VAI APARECER NO SEU TERMINAL/VS CODE E NÃO VAI SER APAGADO PELO RERUN
+        print(f"\n" + "="*50)
+        print(f"🚨 ERRO GRAVE NO HUGGING FACE 🚨")
+        print(f"Motivo: {e}")
+        print("="*50 + "\n")
         return None
 
 def gerar_pergunta_livro(g_key, livro, faixa):
@@ -255,11 +259,13 @@ def gerar_pergunta_livro(g_key, livro, faixa):
     GABARITO: [Letra e Resposta Correta com explicação curta]
     """
     try:
+        # ATUALIZADO PARA 3.5 FLASH
         response = client.models.generate_content(model='gemini-3.5-flash', contents=prompt)
         return response.text
     except Exception:
         try:
             time.sleep(2)
+            # ATUALIZADO PARA 3.5 FLASH LITE
             response = client.models.generate_content(model='gemini-3.5-flash-lite', contents=prompt)
             return response.text
         except Exception as e_lite:
