@@ -46,12 +46,27 @@ with st.sidebar:
             "Faixa Etária:",
             ["Ensino Fundamental I (1º ao 3º ano)", "Ensino Fundamental I (4º e 5º ano)", "Ensino Fundamental II"]
         )
+        
+        # --- NOVO: SELETOR DE ESTILO VISUAL FLUX ---
+        estilo_arte = st.selectbox(
+            "🎨 Estilo Visual das Imagens:",
+            [
+                "Children's Storybook Illustration, vibrant colors, flat design",
+                "Studio Ghibli Anime Style, magical atmosphere",
+                "16-bit Retro Video Game Pixel Art",
+                "Soft Watercolor Painting, fantasy children book",
+                "3D Pixar CGI Animation style, cute and highly detailed"
+            ]
+        )
+        
         st.session_state["total_rodadas"] = total_rodadas
         st.session_state["faixa_etaria"] = faixa_etaria
+        st.session_state["estilo_arte"] = estilo_arte
     else:
         st.info(f"📌 **Rodadas totais:** {st.session_state.get('total_rodadas', 20)}")
         st.info(f"📌 **Faixa etária:** {st.session_state.get('faixa_etaria', 'Ensino Fundamental I')}")
         st.info(f"📖 **Mundo Atual:** {st.session_state.get('mundo_mestre', 'Indefinido')}")
+        st.info(f"🎨 **Estilo de Arte:** {st.session_state.get('estilo_arte', '').split(',')[0]}")
 
         st.divider()
         
@@ -60,7 +75,7 @@ with st.sidebar:
             chaves_para_limpar = [
                 "partida_iniciada", "jogadores", "mundo_mestre", 
                 "rodada_atual", "historico", "roteiro_hq", 
-                "aluno_sorteado", "pergunta_atual", "ultimo_dado"
+                "aluno_sorteado", "pergunta_atual", "ultimo_dado", "estilo_arte"
             ]
             for chave in chaves_para_limpar:
                 if chave in st.session_state:
@@ -88,7 +103,7 @@ if "pergunta_atual" not in st.session_state:
     st.session_state.pergunta_atual = None
 
 # ---------------------------------------------------------------------------
-# 4. FUNÇÕES AUXILIARES & IA (COM SISTEMA DE FALLBACK 1.5)
+# 4. FUNÇÕES AUXILIARES & IA 
 # ---------------------------------------------------------------------------
 def rolar_dado():
     return random.randint(1, 20)
@@ -154,10 +169,18 @@ def exibir_card_compacto(coluna, j):
             st.markdown(f"**{status_icon} {primeiro_nome}**{item_str}")
         st.caption(f"🎭 {j['personagem']}")
 
-def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False):
+def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, herois_vivos=None, heroi_ativo=None):
     client = inicializar_cliente_gemini(g_key)
     faixa = st.session_state.get("faixa_etaria", "Ensino Fundamental I")
+    estilo = st.session_state.get("estilo_arte", "vibrant children storybook style")
     
+    # Monta a string dos observadores para orientar a IA visual
+    lista_observadores = ""
+    if herois_vivos:
+        nomes = [h['personagem'] for h in herois_vivos if h != heroi_ativo]
+        if nomes:
+            lista_observadores = f"In the background, observing or reacting, are other diverse young heroes: {', '.join(nomes)}."
+
     instrucao_mestre = f"""
     Você é o Mestre de um RPG pedagógico infantil para a faixa etária: {faixa}.
     
@@ -168,7 +191,12 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False):
     FORMATO DE RESPOSTA (ESTRITO):
     Responda ESTRITAMENTE em duas partes separadas por '---':
     Parte 1: A narrativa da cena (até 2 parágrafos).
-    Parte 2: O prompt em inglês detalhado e visual para a imagem da cena.
+    Parte 2: O prompt em INGLÊS muito detalhado para gerar a imagem. 
+    OBRIGATÓRIO na Parte 2:
+    - O estilo visual DEVE SER EXACTAMENTE este: "{estilo}".
+    - {f"O foco central da imagem deve ser o herói em ação ({heroi_ativo['personagem']})." if heroi_ativo else "A imagem deve mostrar o grupo de heróis."}
+    - {lista_observadores}
+    - Mantenha os traços e roupas dos personagens o mais consistentes possível com a classe/arquétipo deles.
     """
     
     if is_intro:
@@ -180,44 +208,38 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False):
         prompt_contexto += " ESTA É A RODADA FINAL! Narre a grande vitória vitoriosa e épica da turma contra o desafio principal."
 
     try:
-        # TENTATIVA 1: MODELO PRINCIPAL (3.5 Flash)
         response = client.models.generate_content(
-            model='gemini-3.5-flash',
+            model='gemini-2.0-flash',
             contents=prompt_contexto,
             config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
         )
         texto = response.text
     except Exception as e:
-        # TENTATIVA 2: BACKUP (3.5 Flash-lite - Estável) EM CASO DE SPIKE
         try:
-            st.toast("⚠️ Pico de acesso na API! Acionando o backup de estabilidade...", icon="⚡")
-            time.sleep(2) # Pequena pausa para a API respirar
+            st.toast("⚠️ Ajustando conexão da API! Acionando modelo alternativo...", icon="⚡")
+            time.sleep(2) 
             response = client.models.generate_content(
-                model='gemini-3.5-flash-lite', # Trocado para o 3.5 Flash-lite (mais estável)
+                model='gemini-1.5-flash-8b', 
                 contents=prompt_contexto,
                 config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
             )
             texto = response.text
         except Exception as e_lite:
-            return f"Erro na narrativa (Ambos os modelos falharam): {e_lite}", "fantasy adventure scene"
+            return f"Erro na narrativa: {e_lite}", f"epic scene, {estilo}"
 
     if "---" in texto:
         narrativa, prompt_img = texto.split("---", 1)
     else:
         narrativa = texto
-        prompt_img = "epic fantasy adventure scene for children's storybook"
+        prompt_img = f"epic scene, {estilo}"
     
     return narrativa.strip(), prompt_img.strip()
 
-def gerar_imagem(prompt_text, is_final, token):
+def gerar_imagem(prompt_text, token):
+    # O LLM agora constrói o prompt inteiro (estilo, ação e fundo), não precisamos mais concatenar manualmente
     try:
         client = InferenceClient(api_key=token)
-        if is_final:
-            prompt_completo = "16-bit retro video game ending screen, pixel art, group of diverse young heroes posing victoriously, vibrant colors"
-        else:
-            prompt_completo = f"{prompt_text}, vibrant children storybook style, high quality"
-        
-        image = client.text_to_image(prompt_completo, model="black-forest-labs/FLUX.1-schnell")
+        image = client.text_to_image(prompt_text, model="black-forest-labs/FLUX.1-schnell")
         return image
     except Exception:
         return None
@@ -234,14 +256,12 @@ def gerar_pergunta_livro(g_key, livro, faixa):
     GABARITO: [Letra e Resposta Correta com explicação curta]
     """
     try:
-        # Tenta o modelo principal
-        response = client.models.generate_content(model='gemini-3.5-flash', contents=prompt)
+        response = client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
         return response.text
     except Exception:
         try:
-            # Fallback para o 1.5 Flash com pequena pausa
             time.sleep(2)
-            response = client.models.generate_content(model='gemini-1.5-flash', contents=prompt)
+            response = client.models.generate_content(model='gemini-1.5-flash-8b', contents=prompt)
             return response.text
         except Exception as e_lite:
             return f"Erro ao gerar pergunta: {e_lite}"
@@ -303,10 +323,16 @@ if not st.session_state.partida_iniciada:
                     st.session_state.mundo_mestre = random.choice(livros_disponiveis)
 
                     sortear_proximo_aluno_automatico()
+                    vivos_agora = [j for j in st.session_state.jogadores if j["status"] == "VIVO" and j.get("presente", True)]
 
                     with st.spinner(f"Criando o mundo de '{st.session_state.mundo_mestre}'..."):
-                        narrativa_intro, p_img = gerar_narrativa_rpg(gemini_key, st.session_state.mundo_mestre, is_intro=True)
-                        img_intro = gerar_imagem(p_img, False, hf_token)
+                        narrativa_intro, p_img = gerar_narrativa_rpg(
+                            gemini_key, 
+                            st.session_state.mundo_mestre, 
+                            is_intro=True,
+                            herois_vivos=vivos_agora
+                        )
+                        img_intro = gerar_imagem(p_img, hf_token)
 
                         st.session_state.historico.append({
                             "texto": narrativa_intro,
@@ -337,7 +363,7 @@ else:
     is_ultima_rodada = st.session_state.rodada_atual >= tot_rodadas
 
     # =========================================================================
-    # VISÃO 1: TELA DA TURMA (PROJETOR)
+    # VISÃO 1: TELA DA Turma (PROJETOR)
     # =========================================================================
     if modo_visao == "📺 Tela da Turma (Projetor)":
         auto_refresh = st.checkbox("🔄 Atualização Automática da Projeção", value=True)
@@ -353,7 +379,6 @@ else:
         if st.session_state.historico:
             ultimo = st.session_state.historico[-1]
             
-            # Controle visual da rodada
             rodada_visual = st.session_state.rodada_atual - 1 
             if rodada_visual < 1: rodada_visual = 1
             
@@ -482,8 +507,13 @@ else:
                 )
 
                 with st.spinner("NARRANDO SUCESSO E GERANDO PRÓXIMO DESAFIO..."):
-                    narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto)
-                    img = gerar_imagem(p_img, False, hf_token)
+                    narrativa, p_img = gerar_narrativa_rpg(
+                        gemini_key, 
+                        contexto, 
+                        herois_vivos=vivos, 
+                        heroi_ativo=aluno_selecionado
+                    )
+                    img = gerar_imagem(p_img, hf_token)
 
                     st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [SUCESSO] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Sucesso de {aluno_selecionado['personagem']}"})
@@ -511,9 +541,17 @@ else:
                     f"INSTRUÇÃO IMPORTANTE: Primeiro, narre a falha e o congelamento. EM SEGUIDA, aplique o 'Fail Forward': a falha causa uma complicação nova ou o obstáculo evolui para um cenário pior, exigindo ação imediata do próximo herói."
                 )
 
+                # Removemos o recém congelado da foto do fundo para manter a lógica
+                vivos_restantes = [v for v in vivos if v['aluno'] != aluno_selecionado['aluno']]
+
                 with st.spinner("REGISTRANDO FALHA E GERANDO PRÓXIMO DESAFIO..."):
-                    narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto)
-                    img = gerar_imagem(p_img, False, hf_token)
+                    narrativa, p_img = gerar_narrativa_rpg(
+                        gemini_key, 
+                        contexto, 
+                        herois_vivos=vivos_restantes, 
+                        heroi_ativo=aluno_selecionado
+                    )
+                    img = gerar_imagem(p_img, hf_token)
 
                     st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [FALHA] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Falha de {aluno_selecionado['personagem']}"})
@@ -530,8 +568,13 @@ else:
             if st.button("🎬 Gerar Gran Finale!", type="primary"):
                 contexto = f"Mundo da história: {st.session_state.mundo_mestre}. Vitória final de todos os heróis reunidos!"
                 with st.spinner("Criando cena final..."):
-                    narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto, is_final=True)
-                    img_final = gerar_imagem(p_img, is_final=True, token=hf_token)
+                    narrativa, p_img = gerar_narrativa_rpg(
+                        gemini_key, 
+                        contexto, 
+                        is_final=True,
+                        herois_vivos=vivos
+                    )
+                    img_final = gerar_imagem(p_img, token=hf_token)
 
                     st.session_state.historico.append({"texto": narrativa, "img": img_final, "heroi": "TODOS OS HERÓIS REUNIDOS"})
                     st.session_state.roteiro_hq.append(f"CENA FINAL: Vitória Épica. {narrativa}")
