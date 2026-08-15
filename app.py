@@ -52,17 +52,20 @@ with st.sidebar:
         
     if gemini_key and hf_token:
         st.success("🟢 Chaves de API Ativas!")
-        if gemini_key and hf_token:
-        st.success("🟢 Chaves de API Ativas!")
         
-        # --- NOVO BLOCO DETETIVE ---
+        # --- BLOCO DETETIVE DE MODELOS CORPORATIVOS ---
         try:
             genai.configure(api_key=gemini_key)
             modelos_permitidos = [m.name.replace('models/', '') for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            st.caption(f"🤖 **Modelos liberados para a sua chave:** \n{', '.join(modelos_permitidos)}")
-        except Exception:
-            pass
-        # ---------------------------
+            
+            with st.expander("🤖 Ver Modelos Liberados", expanded=True):
+                if modelos_permitidos:
+                    st.write(", ".join(modelos_permitidos))
+                else:
+                    st.warning("Nenhum modelo compatível encontrado para esta chave.")
+        except Exception as e:
+            st.error(f"Erro ao listar modelos: {e}")
+        # ----------------------------------------------
     else:
         st.warning("⚠️ Insira as chaves nos Secrets ou nos campos acima.")
     
@@ -118,7 +121,6 @@ def extrair_opcoes(texto_narrativa: str):
     return op1, op2
 
 def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orientacao_idade: str):
-    # Configuração clássica da API
     genai.configure(api_key=g_key)
     
     system_instruction = f"""
@@ -140,13 +142,12 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
     max_tentativas = 3
     for tentativa in range(max_tentativas):
         try:
-            # Inicializa o modelo já com a instrução de sistema
+            # TENTA PRIMEIRO O MODELO PRO MAIS RECENTE
             model = genai.GenerativeModel(
                 model_name="gemini-1.5-pro-latest",
                 system_instruction=system_instruction
             )
             
-            # Chamada clássica
             response = model.generate_content(f"Ação/Contexto: {prompt_usuario}")
             
             texto = response.text
@@ -159,6 +160,21 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
             return narrativa.strip(), prompt_img.strip()
 
         except Exception as e:
+            # SE O MODELO ACIMA FALHAR, TENTA O GEMINI-PRO CLÁSSICO COMO PLANO B
+            if "NOT_FOUND" in str(e):
+                model = genai.GenerativeModel(model_name="gemini-pro")
+                # No gemini-pro clássico, mandamos a instrução junto no prompt
+                response = model.generate_content(f"{system_instruction}\n\nAção/Contexto: {prompt_usuario}")
+                
+                texto = response.text
+                if "---" in texto:
+                    narrativa, prompt_img = texto.split("---", 1)
+                else:
+                    narrativa = texto
+                    prompt_img = f"{estilo_prefixo}: storybook magical scene"
+                return narrativa.strip(), prompt_img.strip()
+                
+            # Trata erro de limite de cota (429)
             if ("429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)) and tentativa < max_tentativas - 1:
                 time.sleep(10)
                 continue
