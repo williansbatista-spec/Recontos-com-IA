@@ -209,7 +209,7 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
 
     try:
         response = client.models.generate_content(
-            model='gemini-2.0-flash',
+            model='gemini-3.5-flash',
             contents=prompt_contexto,
             config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
         )
@@ -219,7 +219,7 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
             st.toast("⚠️ Ajustando conexão da API! Acionando modelo alternativo...", icon="⚡")
             time.sleep(2) 
             response = client.models.generate_content(
-                model='gemini-1.5-flash-8b', 
+                model='gemini-3.5-flash-lite', 
                 contents=prompt_contexto,
                 config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
             )
