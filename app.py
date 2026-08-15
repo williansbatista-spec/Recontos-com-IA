@@ -85,14 +85,29 @@ def inicializar_cliente_gemini(key):
 def obter_primeiro_nome(nome_completo):
     return str(nome_completo).strip().split()[0]
 
+def sortear_proximo_aluno_automatico(aluno_atual=None):
+    """Sorteia automaticamente o próximo aluno ativo/vivo"""
+    vivos = [j for j in st.session_state.jogadores if j["status"] == "VIVO" and j.get("presente", True)]
+    if not vivos:
+        st.session_state.aluno_sorteado = None
+        return
+    
+    # Se houver mais de um vivo, sorteia alguém diferente do jogador atual
+    if len(vivos) > 1 and aluno_atual:
+        opcoes = [j for j in vivos if j["aluno"] != aluno_atual["aluno"]]
+        st.session_state.aluno_sorteado = random.choice(opcoes)
+    else:
+        st.session_state.aluno_sorteado = random.choice(vivos)
+
 def renderizar_painel_jogadores():
     """Exibe o painel de heróis de forma compacta (no máximo 2 linhas)"""
     st.markdown("### 🛡️ Painel dos Heróis")
     
-    jogadores = st.session_state.jogadores
-    total = len(jogadores)
+    jogadores_presentes = [j for j in st.session_state.jogadores if j.get("presente", True)]
+    total = len(jogadores_presentes)
     
     if total == 0:
+        st.info("Nenhum aluno cadastrado/presente.")
         return
 
     # Garante no máximo 2 linhas
@@ -102,13 +117,13 @@ def renderizar_painel_jogadores():
     cols_l1 = st.columns(cols_por_linha)
     for idx in range(cols_por_linha):
         if idx < total:
-            exibir_card_compacto(cols_l1[idx], jogadores[idx])
+            exibir_card_compacto(cols_l1[idx], jogadores_presentes[idx])
             
     # Linha 2
     if total > cols_por_linha:
         cols_l2 = st.columns(cols_por_linha)
         for idx in range(cols_por_linha, total):
-            exibir_card_compacto(cols_l2[idx - cols_por_linha], jogadores[idx])
+            exibir_card_compacto(cols_l2[idx - cols_por_linha], jogadores_presentes[idx])
             
     st.divider()
 
@@ -252,7 +267,8 @@ if not st.session_state.partida_iniciada:
                             "habilidade": str(row[c_habilidade]),
                             "item": str(row[c_item]),
                             "status": "VIVO",
-                            "tem_porcao_resgate": False
+                            "tem_porcao_resgate": False,
+                            "presente": True
                         })
                     
                     st.session_state.jogadores = jogadores
@@ -260,6 +276,9 @@ if not st.session_state.partida_iniciada:
                     # Sortear o Mundo Base ÚNICO
                     livros_disponiveis = list(set([j["livro"] for j in jogadores]))
                     st.session_state.mundo_mestre = random.choice(livros_disponiveis)
+
+                    # Sorteio inicial do primeiro jogador
+                    sortear_proximo_aluno_automatico()
 
                     # Gerar Prólogo / Introdução
                     with st.spinner(f"Criando o mundo de '{st.session_state.mundo_mestre}'..."):
@@ -289,8 +308,8 @@ else:
         index=0
     )
 
-    vivos = [j for j in st.session_state.jogadores if j["status"] == "VIVO"]
-    congelados = [j for j in st.session_state.jogadores if j["status"] == "CONGELADO"]
+    vivos = [j for j in st.session_state.jogadores if j["status"] == "VIVO" and j.get("presente", True)]
+    congelados = [j for j in st.session_state.jogadores if j["status"] == "CONGELADO" and j.get("presente", True)]
     tot_rodadas = st.session_state.get("total_rodadas", 20)
     is_ultima_rodada = st.session_state.rodada_atual >= tot_rodadas
 
@@ -304,7 +323,7 @@ else:
         renderizar_painel_jogadores()
 
         # Destaque do Herói da Rodada
-        if st.session_state.aluno_sorteado:
+        if st.session_state.aluno_sorteado and st.session_state.aluno_sorteado.get("presente", True):
             h = st.session_state.aluno_sorteado
             p_nome = obter_primeiro_nome(h['aluno'])
             st.markdown(f"### ⭐ Herói em Ação: **{p_nome}** como *{h['personagem']}*")
@@ -340,6 +359,20 @@ else:
     else:
         st.header("🕹️ Controle Exclusivo do Mestre")
         
+        # Gestão de Presença de Alunos
+        with st.expander("📋 Chamada de Alunos (Marque/Desmarque Faltantes)"):
+            for j in st.session_state.jogadores:
+                col_p1, col_p2 = st.columns([3, 1])
+                with col_p1:
+                    st.write(f"**{j['aluno']}** ({j['personagem']})")
+                with col_p2:
+                    is_p = st.checkbox("Presente", value=j.get("presente", True), key=f"pres_{j['aluno']}")
+                    if is_p != j.get("presente", True):
+                        j["presente"] = is_p
+                        if not is_p and st.session_state.aluno_sorteado == j:
+                            sortear_proximo_aluno_automatico()
+                        st.rerun()
+
         # Painel compacto em no máximo 2 linhas
         renderizar_painel_jogadores()
         
@@ -347,16 +380,14 @@ else:
             col_m1, col_m2 = st.columns(2)
 
             with col_m1:
-                st.subheader("1. Sorteio do Herói da Rodada")
-                if st.button("🎲 Sortear Próximo Aluno", type="primary"):
-                    if vivos:
-                        st.session_state.aluno_sorteado = random.choice(vivos)
-                        st.session_state.pergunta_atual = None
-                        st.session_state.pop("ultimo_dado", None)
-                        st.rerun()
+                st.subheader("1. Herói da Rodada (Sorteio Automático)")
+                
+                # Se ainda não houver um sorteado, realiza o sorteio inicial
+                if not st.session_state.aluno_sorteado and vivos:
+                    sortear_proximo_aluno_automatico()
 
                 aluno_selecionado = st.selectbox(
-                    "Aluno em ação:",
+                    "Aluno em ação na rodada atual:",
                     options=vivos,
                     index=vivos.index(st.session_state.aluno_sorteado) if st.session_state.aluno_sorteado in vivos else 0,
                     format_func=lambda j: f"{obter_primeiro_nome(j['aluno'])} ({j['personagem']})"
@@ -374,6 +405,13 @@ else:
                             aluno_selecionado["tem_porcao_resgate"] = False
                             st.success(f"{obter_primeiro_nome(aluno_salvar['aluno'])} voltou ao jogo!")
                             st.rerun()
+
+                # Botão para trocar aluno manualmente se o Mestre precisar
+                if st.button("🔄 Resortear Aluno Manualmente"):
+                    sortear_proximo_aluno_automatico(st.session_state.aluno_sorteado)
+                    st.session_state.pergunta_atual = None
+                    st.session_state.pop("ultimo_dado", None)
+                    st.rerun()
 
             with col_m2:
                 st.subheader("2. Resolução do Desafio")
@@ -427,8 +465,11 @@ else:
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Sucesso de {aluno_selecionado['personagem']}"})
                     
                     st.session_state.rodada_atual += 1
-                    st.session_state.aluno_sorteado = None
                     st.session_state.pergunta_atual = None
+                    st.session_state.pop("ultimo_dado", None)
+                    
+                    # SORTEIO AUTOMÁTICO DO PRÓXIMO ALUNO DA RODADA
+                    sortear_proximo_aluno_automatico(aluno_selecionado)
                     st.rerun()
 
             if aluno_selecionado and col_b2.button("❌ REGISTRAR FALHA (Congelar & Avançar)", use_container_width=True):
@@ -452,8 +493,11 @@ else:
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Falha de {aluno_selecionado['personagem']}"})
                     
                     st.session_state.rodada_atual += 1
-                    st.session_state.aluno_sorteado = None
                     st.session_state.pergunta_atual = None
+                    st.session_state.pop("ultimo_dado", None)
+                    
+                    # SORTEIO AUTOMÁTICO DO PRÓXIMO ALUNO DA RODADA
+                    sortear_proximo_aluno_automatico(aluno_selecionado)
                     st.rerun()
 
         else:
