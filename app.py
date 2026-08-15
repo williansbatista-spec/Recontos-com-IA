@@ -1,6 +1,7 @@
 import os
 import random
 import io
+import time
 import streamlit as st
 from google import genai
 from huggingface_hub import InferenceClient
@@ -41,9 +42,9 @@ FAIXAS_ETARIAS = {
 with st.sidebar:
     st.header("🔑 Configurações de API")
     
-    # Tenta obter as chaves dos Secrets primeiro
-    gemini_key = st.secrets.get("GEMINI_API_KEY") if "GEMINI_API_KEY" in st.secrets else None
-    hf_token = st.secrets.get("HF_TOKEN") if "HF_TOKEN" in st.secrets else None
+    # Tenta obter as chaves dos Secrets primeiro e limpa espaços vazios
+    gemini_key = st.secrets.get("GEMINI_API_KEY", "").strip()
+    hf_token = st.secrets.get("HF_TOKEN", "").strip()
 
     # Se não encontrar nos Secrets, exibe os campos manuais
     if not gemini_key:
@@ -126,25 +127,31 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
     {estilo_prefixo}: [descrição detalhada e colorida da cena visualmente, sem texto na imagem]
     """
     
-    try:
-        response = client.models.generate_content(
-            model="gemini-flash-latest",
-            contents=f"{system_instruction}\n\nAção/Contexto: {prompt_usuario}"
-        )
-    except Exception:
-        response = client.models.generate_content(
-            model="gemini-flash-latest",
-            contents=f"{system_instruction}\n\nAção/Contexto: {prompt_usuario}"
-        )
-    
-    texto = response.text
-    if "---" in texto:
-        narrativa, prompt_img = texto.split("---", 1)
-    else:
-        narrativa = texto
-        prompt_img = f"{estilo_prefixo}: storybook magical scene"
-        
-    return narrativa.strip(), prompt_img.strip()
+    max_tentativas = 3
+    for tentativa in range(max_tentativas):
+        try:
+            # Força o uso do modelo estável que possui maior cota gratuita
+            response = client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=f"{system_instruction}\n\nAção/Contexto: {prompt_usuario}"
+            )
+            
+            texto = response.text
+            if "---" in texto:
+                narrativa, prompt_img = texto.split("---", 1)
+            else:
+                narrativa = texto
+                prompt_img = f"{estilo_prefixo}: storybook magical scene"
+                
+            return narrativa.strip(), prompt_img.strip()
+
+        except Exception as e:
+            # Trata erro de limite (429 RESOURCE_EXHAUSTED). Espera 10s e tenta de novo.
+            if ("429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)) and tentativa < max_tentativas - 1:
+                time.sleep(10)
+                continue
+            else:
+                raise e
 
 def gerar_imagem_hf(prompt_img: str, estilo_prefixo: str, token: str):
     """ Gera imagem via Hugging Face Serverless Inference (FLUX.1) """
@@ -169,7 +176,7 @@ def executar_rodada(acao_texto: str):
         st.error("Por favor, insira o token da Hugging Face.")
         return
 
-    with st.spinner("🧠 O Mestre está escrevendo a história e desenhando a cena com FLUX.1..."):
+    with st.spinner("🧠 O Mestre está escrevendo a história e desenhando a cena..."):
         try:
             narrativa, prompt_img = gerar_narrativa(
                 acao_texto, 
@@ -218,7 +225,7 @@ if not st.session_state.historico:
             else:
                 executar_rodada(contexto_inicial)
 
-# CASO 2: O JOGO JÁ COMECCOU (SISTEMA DE VOTAÇÃO ATIVO)
+# CASO 2: O JOGO JÁ COMEÇOU (SISTEMA DE VOTAÇÃO ATIVO)
 else:
     # Recupera as opções da ÚLTIMA narrativa do histórico
     ultima_narrativa = st.session_state.historico[-1]["narrativa"]
