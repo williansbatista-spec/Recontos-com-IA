@@ -210,19 +210,25 @@ if not st.session_state.partida_iniciada:
             st.error(f"Erro ao processar o arquivo CSV: {e}")
 
 # ---------------------------------------------------------------------------
-# 6. PAINEL DE DUPLA TELA (MESTRE vs. TURMA)
+# 6. MODO DE VISUALIZAÇÃO (MESTRE OU PROJETOR VIA BARRA LATERAL)
 # ---------------------------------------------------------------------------
 else:
-    tab_projetor, tab_mestre = st.tabs(["📺 TELA DA TURMA (PROJETOR)", "🕹️ PAINEL DE CONTROLE DO MESTRE"])
+    modo_visao = st.sidebar.radio(
+        "🖥️ Mudar Visão desta Janela:",
+        ["📺 Tela da Turma (Projetor)", "🕹️ Controle do Mestre"],
+        index=0
+    )
 
     vivos = [j for j in st.session_state.jogadores if j["status"] == "VIVO"]
     congelados = [j for j in st.session_state.jogadores if j["status"] == "CONGELADO"]
     is_ultima_rodada = st.session_state.rodada_atual >= total_rodadas
 
     # =========================================================================
-    # TAB 1: TELA DA TURMA (PROJETOR)
+    # VISÃO 1: TELA DA TURMA (PROJETOR)
     # =========================================================================
-    with tab_projetor:
+    if modo_visao == "📺 Tela da Turma (Projetor)":
+        auto_refresh = st.checkbox("🔄 Atualização Automática da Projeção", value=True)
+        
         col_p1, col_p2, col_p3 = st.columns(3)
         col_p1.metric("🌍 Mundo Mestre", st.session_state.mundo_mestre)
         col_p2.metric("⏳ Rodada", f"{st.session_state.rodada_atual} / {total_rodadas}")
@@ -246,7 +252,7 @@ else:
                 if ultimo["img"]:
                     st.image(ultimo["img"], use_container_width=True)
             with c_txt:
-                st.markdown(f"### Narrativa:")
+                st.markdown("### Narrativa:")
                 st.write(ultimo["texto"])
 
         # Linha do Tempo
@@ -256,10 +262,14 @@ else:
             with st.expander(f"Cena: {item['heroi']}"):
                 st.write(item["texto"])
 
+        if auto_refresh:
+            time.sleep(3)
+            st.rerun()
+
     # =========================================================================
-    # TAB 2: PAINEL DE CONTROLE DO MESTRE (SEGUNDA TELA)
+    # VISÃO 2: PAINEL DE CONTROLE DO MESTRE
     # =========================================================================
-    with tab_mestre:
+    else:
         st.header("🕹️ Controle Exclusivo do Mestre")
         
         if not is_ultima_rodada:
@@ -331,7 +341,7 @@ else:
                     f"e habilidade '{aluno_selecionado['habilidade']}' para superar o obstáculo com SUCESSO!"
                 )
 
-                with st.spinner("Gerando resultado na Tela da Turma..."):
+                with st.spinner("Gerando resultado na Projeção..."):
                     narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto)
                     img = gerar_imagem(p_img, False, hf_token)
 
@@ -353,7 +363,7 @@ else:
                     f"O herói {aluno_selecionado['personagem']} FALHOU. Narre como ele foi congelado de forma mágica e sem violência."
                 )
 
-                with st.spinner("Gerando resultado na Tela da Turma..."):
+                with st.spinner("Gerando resultado na Projeção..."):
                     narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto)
                     img = gerar_imagem(p_img, False, hf_token)
 
