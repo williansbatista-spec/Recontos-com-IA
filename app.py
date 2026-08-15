@@ -131,7 +131,7 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
         try:
             # Inicializa o modelo já com a instrução de sistema
             model = genai.GenerativeModel(
-                model_name="gemini-1.5-flash",
+                model_name="gemini-1.5-pro-latest",
                 system_instruction=system_instruction
             )
             
