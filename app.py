@@ -228,7 +228,7 @@ def gerar_imagem(prompt_text, chave_api):
         client = genai.Client(api_key=chave_api) 
         
         result = client.models.generate_images(
-            model='imagen-3.0-generate-001',
+            model='imagen-4.0-generate-001',
             prompt=prompt_text,
             config=types.GenerateImagesConfig(
                 number_of_images=1,
