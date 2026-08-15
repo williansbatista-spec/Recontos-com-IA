@@ -130,7 +130,7 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
         try:
             # Chamada padrão exigida para os modelos 2.5
             response = client.models.generate_content(
-                model='gemini-2.5-flash',
+                model='gemini-flash-latest',
                 contents=f"Ação/Contexto: {prompt_usuario}",
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
