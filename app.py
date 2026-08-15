@@ -256,12 +256,12 @@ def gerar_pergunta_livro(g_key, livro, faixa):
     GABARITO: [Letra e Resposta Correta com explicação curta]
     """
     try:
-        response = client.models.generate_content(model='gemini-2.0-flash', contents=prompt)
+        response = client.models.generate_content(model='gemini-3.5-flash', contents=prompt)
         return response.text
     except Exception:
         try:
             time.sleep(2)
-            response = client.models.generate_content(model='gemini-1.5-flash-8b', contents=prompt)
+            response = client.models.generate_content(model='gemini-3.5-flash-lite', contents=prompt)
             return response.text
         except Exception as e_lite:
             return f"Erro ao gerar pergunta: {e_lite}"
