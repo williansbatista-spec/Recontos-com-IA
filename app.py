@@ -234,18 +234,21 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
     
     return narrativa.strip(), prompt_img.strip()
 
+
+# ===========================================================================
+# 👇 AQUI ESTÁ A FUNÇÃO ATUALIZADA (O ERRO VAI APARECER NA TELA) 👇
+# ===========================================================================
 def gerar_imagem(prompt_text, token):
     try:
         client = InferenceClient(api_key=token)
         image = client.text_to_image(prompt_text, model="black-forest-labs/FLUX.1-schnell")
         return image
     except Exception as e:
-        # O ERRO VAI APARECER NO SEU TERMINAL/VS CODE E NÃO VAI SER APAGADO PELO RERUN
-        print(f"\n" + "="*50)
-        print(f"🚨 ERRO GRAVE NO HUGGING FACE 🚨")
-        print(f"Motivo: {e}")
-        print("="*50 + "\n")
+        # Se falhar, mostra o erro direto na interface do Streamlit para descobrirmos o motivo
+        st.error(f"🚨 **FALHA NO HUGGING FACE (GERAÇÃO DE IMAGEM)** 🚨\n\n**Motivo:** {e}")
         return None
+# ===========================================================================
+
 
 def gerar_pergunta_livro(g_key, livro, faixa):
     client = inicializar_cliente_gemini(g_key)
