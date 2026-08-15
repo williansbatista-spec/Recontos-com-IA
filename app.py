@@ -1,4 +1,5 @@
 import os
+import math
 import random
 import time
 import pandas as pd
@@ -85,45 +86,52 @@ def obter_primeiro_nome(nome_completo):
     return str(nome_completo).strip().split()[0]
 
 def renderizar_painel_jogadores():
-    """Exibe o painel de ícones e primeiro nome com status e itens"""
+    """Exibe o painel de heróis de forma compacta (no máximo 2 linhas)"""
     st.markdown("### 🛡️ Painel dos Heróis")
     
-    # Criar colunas para os jogadores (até 6 por linha)
     jogadores = st.session_state.jogadores
-    num_cols = min(len(jogadores), 6) if len(jogadores) > 0 else 1
-    cols = st.columns(num_cols)
+    total = len(jogadores)
     
-    for idx, j in enumerate(jogadores):
-        col = cols[idx % num_cols]
-        primeiro_nome = obter_primeiro_nome(j["aluno"])
-        is_ativo = j["status"] == "VIVO"
-        status_icon = "🛡️" if is_ativo else "🧊"
-        status_texto = "Ativo" if is_ativo else "Congelado"
-        
-        # Verificar se é o aluno sorteado da rodada
-        is_sorteado = (
-            st.session_state.aluno_sorteado and 
-            st.session_state.aluno_sorteado["aluno"] == j["aluno"]
-        )
-        
-        # Montar os itens do inventário
-        itens = []
-        if j.get("tem_porcao_resgate"):
-            itens.append("🧪 Poção")
-        
-        txt_itens = " | ".join(itens) if itens else "Nenhum"
-        
-        with col:
-            # Destaque visual caso seja o sorteado
-            if is_sorteado:
-                st.markdown(f"⭐ **{status_icon} {primeiro_nome}**")
-            else:
-                st.markdown(f"**{status_icon} {primeiro_nome}**")
+    if total == 0:
+        return
+
+    # Garante no máximo 2 linhas
+    cols_por_linha = math.ceil(total / 2)
+    
+    # Linha 1
+    cols_l1 = st.columns(cols_por_linha)
+    for idx in range(cols_por_linha):
+        if idx < total:
+            exibir_card_compacto(cols_l1[idx], jogadores[idx])
             
-            st.caption(f"🎭 {j['personagem']}")
-            st.caption(f"Status: {status_texto}")
-            st.caption(f"🎒 {txt_itens}")
-            st.divider()
+    # Linha 2
+    if total > cols_por_linha:
+        cols_l2 = st.columns(cols_por_linha)
+        for idx in range(cols_por_linha, total):
+            exibir_card_compacto(cols_l2[idx - cols_por_linha], jogadores[idx])
+            
+    st.divider()
+
+def exibir_card_compacto(coluna, j):
+    """Renderiza um único jogador de forma enxuta"""
+    primeiro_nome = obter_primeiro_nome(j["aluno"])
+    is_ativo = j["status"] == "VIVO"
+    status_icon = "🛡️" if is_ativo else "🧊"
+    
+    is_sorteado = (
+        st.session_state.aluno_sorteado and 
+        st.session_state.aluno_sorteado["aluno"] == j["aluno"]
+    )
+    
+    item_str = " 🧪" if j.get("tem_porcao_resgate") else ""
+    
+    with coluna:
+        if is_sorteado:
+            st.markdown(f"⭐ **{status_icon} {primeiro_nome}**{item_str}")
+        else:
+            st.markdown(f"**{status_icon} {primeiro_nome}**{item_str}")
+        
+        st.caption(f"🎭 {j['personagem']}")
 
 def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False):
     client = inicializar_cliente_gemini(g_key)
@@ -292,10 +300,8 @@ else:
     if modo_visao == "📺 Tela da Turma (Projetor)":
         auto_refresh = st.checkbox("🔄 Atualização Automática da Projeção", value=True)
         
-        # PAINEL NOVO DE JOGADORES (Substituiu as métricas antigas)
+        # Painel compacto em no máximo 2 linhas
         renderizar_painel_jogadores()
-
-        st.divider()
 
         # Destaque do Herói da Rodada
         if st.session_state.aluno_sorteado:
@@ -334,7 +340,7 @@ else:
     else:
         st.header("🕹️ Controle Exclusivo do Mestre")
         
-        # Exibe o painel de status também no controle do Mestre
+        # Painel compacto em no máximo 2 linhas
         renderizar_painel_jogadores()
         
         if not is_ultima_rodada:
@@ -400,7 +406,6 @@ else:
             col_b1, col_b2 = st.columns(2)
 
             if aluno_selecionado and col_b1.button("✅ APROVAR SUCESSO (Avançar História)", type="primary", use_container_width=True):
-                # 30% de chance de ganhar item especial (Poção de Resgate)
                 if random.random() < 0.30:
                     aluno_selecionado["tem_porcao_resgate"] = True
                     st.toast(f"✨ {obter_primeiro_nome(aluno_selecionado['aluno'])} ganhou uma Poção de Resgate!")
