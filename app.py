@@ -2,7 +2,7 @@ import os
 import random
 import time
 import streamlit as st
-from google import genai
+import google.generativeai as genai  # <-- IMPORTAÇÃO CLÁSSICA
 from huggingface_hub import InferenceClient
 
 # ---------------------------------------------------------------------------
@@ -107,7 +107,8 @@ def extrair_opcoes(texto_narrativa: str):
     return op1, op2
 
 def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orientacao_idade: str):
-    client = genai.Client(api_key=g_key)
+    # Configuração clássica da API
+    genai.configure(api_key=g_key)
     
     system_instruction = f"""
     Você é o Mestre de um RPG pedagógico infantil.
@@ -128,12 +129,14 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
     max_tentativas = 3
     for tentativa in range(max_tentativas):
         try:
-            # MÉTODO CORRETO E MODELO EXISTENTE (2.0-flash) COM O CONFIG
-            response = client.models.generate_content(
-                model="gemini-1.5-flash",
-                contents=f"Ação/Contexto: {prompt_usuario}",
-                config={"system_instruction": system_instruction}
+            # Inicializa o modelo já com a instrução de sistema
+            model = genai.GenerativeModel(
+                model_name="gemini-1.5-flash",
+                system_instruction=system_instruction
             )
+            
+            # Chamada clássica
+            response = model.generate_content(f"Ação/Contexto: {prompt_usuario}")
             
             texto = response.text
             if "---" in texto:
@@ -145,7 +148,6 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
             return narrativa.strip(), prompt_img.strip()
 
         except Exception as e:
-            # Trata erro de limite (429 RESOURCE_EXHAUSTED). Espera 10s e tenta de novo.
             if ("429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)) and tentativa < max_tentativas - 1:
                 time.sleep(10)
                 continue
