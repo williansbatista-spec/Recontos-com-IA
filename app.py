@@ -17,7 +17,6 @@ st.set_page_config(
 )
 
 st.title("🎲 RPG Escolar: O Multiverso da Leitura")
-st.caption("Aventura Interativa Pedagógica com Registro de Roteiro para HQ/Vídeo")
 
 # ---------------------------------------------------------------------------
 # 2. BARRA LATERAL: API & CONFIGURAÇÕES
@@ -62,6 +61,8 @@ if "roteiro_hq" not in st.session_state:
     st.session_state.roteiro_hq = []
 if "aluno_sorteado" not in st.session_state:
     st.session_state.aluno_sorteado = None
+if "pergunta_atual" not in st.session_state:
+    st.session_state.pergunta_atual = None
 
 # ---------------------------------------------------------------------------
 # 4. FUNÇÕES AUXILIARES & IA
@@ -120,7 +121,15 @@ def gerar_imagem(prompt_text, is_final, token):
 
 def gerar_pergunta_livro(g_key, livro, faixa):
     client = inicializar_cliente_gemini(g_key)
-    prompt = f"Gere uma pergunta simples de múltipla escolha sobre o livro '{livro}' adequada para {faixa}. Forneça a pergunta e a resposta correta no final."
+    prompt = f"""
+    Gere uma pergunta de múltipla escolha sobre o livro '{livro}' para a faixa etária {faixa}.
+    Formate assim:
+    PERGUNTA: [Texto da Pergunta]
+    A) [Opção A]
+    B) [Opção B]
+    C) [Opção C]
+    GABARITO: [Letra e Resposta Correta com explicação curta]
+    """
     try:
         response = client.models.generate_content(model='gemini-3.5-flash', contents=prompt)
         return response.text
@@ -128,7 +137,7 @@ def gerar_pergunta_livro(g_key, livro, faixa):
         return f"Erro ao gerar pergunta: {e}"
 
 # ---------------------------------------------------------------------------
-# 5. TELA DE CARREGAMENTO (IMPORTAÇÃO DO CSV & INTRODUÇÃO)
+# 5. TELA DE CARREGAMENTO (IMPORTAÇÃO DO CSV)
 # ---------------------------------------------------------------------------
 if not st.session_state.partida_iniciada:
     st.header("📂 1. Carregar Ficha da Turma (CSV)")
@@ -150,7 +159,6 @@ if not st.session_state.partida_iniciada:
                 df = pd.read_csv(csv_file, sep=';')
 
             df.columns = df.columns.str.strip()
-            st.dataframe(df.head(), use_container_width=True)
             
             col_map = {col.lower(): col for col in df.columns}
             c_aluno = col_map.get("nome do aluno") or col_map.get("aluno") or col_map.get("nome")
@@ -162,6 +170,9 @@ if not st.session_state.partida_iniciada:
             if not all([c_aluno, c_livro, c_personagem, c_habilidade, c_item]):
                 st.error("⚠️ Não encontramos todas as colunas necessárias! Certifique-se de que seu arquivo possui: 'Nome do Aluno', 'Livro Lido', 'Nome do Personagem', 'Habilidade' e 'Item Mágico'.")
             else:
+                st.success(f"🟢 {len(df)} alunos carregados com sucesso!")
+                st.dataframe(df, use_container_width=True)
+                
                 if st.button("🚀 Iniciar Aventura e Gerar Introdução!", type="primary"):
                     jogadores = []
                     for _, row in df.iterrows():
@@ -180,7 +191,7 @@ if not st.session_state.partida_iniciada:
                     mundo_sorteado = random.choice(livros_disponiveis)
                     st.session_state.mundo_mestre = mundo_sorteado
 
-                    # Gerar Prólogo / Introdução da História
+                    # Gerar Prólogo / Introdução
                     with st.spinner("O Mestre está criando o mundo da aventura..."):
                         narrativa_intro, p_img = gerar_narrativa_rpg(gemini_key, mundo_sorteado, is_intro=True)
                         img_intro = gerar_imagem(p_img, False, hf_token)
@@ -199,172 +210,179 @@ if not st.session_state.partida_iniciada:
             st.error(f"Erro ao processar o arquivo CSV: {e}")
 
 # ---------------------------------------------------------------------------
-# 6. PAINEL DO JOGO (PARTIDA ATIVA)
+# 6. PAINEL DE DUPLA TELA (MESTRE vs. TURMA)
 # ---------------------------------------------------------------------------
 else:
-    # Cabeçalho de Status
-    c_head1, c_head2, c_head3 = st.columns(3)
-    c_head1.metric("Mundo Mestre Sorteado", st.session_state.mundo_mestre)
-    c_head2.metric("Rodada Atual", f"{st.session_state.rodada_atual} / {total_rodadas}")
-    
+    tab_projetor, tab_mestre = st.tabs(["📺 TELA DA TURMA (PROJETOR)", "🕹️ PAINEL DE CONTROLE DO MESTRE"])
+
     vivos = [j for j in st.session_state.jogadores if j["status"] == "VIVO"]
     congelados = [j for j in st.session_state.jogadores if j["status"] == "CONGELADO"]
-    c_head3.metric("Alunos Ativos", f"{len(vivos)} / {len(st.session_state.jogadores)}")
-    
-    st.divider()
-
-    # Checagem de Fim de Jogo
     is_ultima_rodada = st.session_state.rodada_atual >= total_rodadas
 
-    if not is_ultima_rodada:
-        st.subheader("⚔️ Próximo Desafio")
+    # =========================================================================
+    # TAB 1: TELA DA TURMA (PROJETOR)
+    # =========================================================================
+    with tab_projetor:
+        col_p1, col_p2, col_p3 = st.columns(3)
+        col_p1.metric("🌍 Mundo Mestre", st.session_state.mundo_mestre)
+        col_p2.metric("⏳ Rodada", f"{st.session_state.rodada_atual} / {total_rodadas}")
+        col_p3.metric("🛡️ Heróis Ativos", f"{len(vivos)} / {len(st.session_state.jogadores)}")
 
-        # Botão de Sorteio do Aluno
-        col_sorteio1, col_sorteio2 = st.columns([1, 2])
-        with col_sorteio1:
-            if st.button("🎲 Sortear Herói para o Desafio!", type="primary", use_container_width=True):
-                if vivos:
-                    st.session_state.aluno_sorteado = random.choice(vivos)
-                    st.session_state.pop("ultimo_dado", None)
-                    st.session_state.pop("pergunta_atual", None)
-                else:
-                    st.warning("Todos os alunos foram congelados!")
+        st.divider()
 
-        # Seleção / Confirmação do Herói
-        aluno_selecionado = st.selectbox(
-            "Herói selecionado:",
-            options=vivos,
-            index=vivos.index(st.session_state.aluno_sorteado) if st.session_state.aluno_sorteado in vivos else 0,
-            format_func=lambda j: f"⭐ {j['aluno']} ({j['personagem']}) - Item: {j['item']} [Livro: {j['livro']}]"
-        ) if vivos else None
+        # Destaque do Herói da Rodada
+        if st.session_state.aluno_sorteado:
+            h = st.session_state.aluno_sorteado
+            st.markdown(f"### ⭐ Herói em Destaque: **{h['aluno']}** como *{h['personagem']}*")
+            st.info(f"✨ **Item:** {h['item']} | 🪄 **Habilidade:** {h['habilidade']} | 📖 **Livro Base:** {h['livro']}")
 
-        if aluno_selecionado:
-            st.session_state.aluno_sorteado = aluno_selecionado
+        # Exibição do Último Evento / Imagem Principal
+        if st.session_state.historico:
+            ultimo = st.session_state.historico[-1]
+            st.subheader(f"🎬 {ultimo['heroi']}")
             
-            # Alerta de Resgate se houver congelados
-            if aluno_selecionado.get("tem_porcao_resgate") and congelados:
-                st.warning(f"✨ {aluno_selecionado['aluno']} possui uma Poção de Resgate!")
-                aluno_para_salvar = st.selectbox("Escolha um colega para descongelar:", options=congelados, format_func=lambda x: x["aluno"])
-                if st.button("🧪 Usar Poção e Salvar Colega!"):
-                    aluno_para_salvar["status"] = "VIVO"
-                    aluno_selecionado["tem_porcao_resgate"] = False
-                    st.success(f"{aluno_para_salvar['aluno']} foi descongelado e voltou ao jogo!")
-                    st.rerun()
+            c_img, c_txt = st.columns([1, 1])
+            with c_img:
+                if ultimo["img"]:
+                    st.image(ultimo["img"], use_container_width=True)
+            with c_txt:
+                st.markdown(f"### Narrativa:")
+                st.write(ultimo["texto"])
 
-            st.info(f"👉 **Aluno:** {aluno_selecionado['aluno']} | **Personagem:** {aluno_selecionado['personagem']} | **Habilidade:** {aluno_selecionado['habilidade']} | **Item:** {aluno_selecionado['item']}")
-            
-            col_dado, col_pergunta = st.columns(2)
-            
-            with col_dado:
-                st.markdown("#### 🎲 Opção A: Teste de Sorte (Dado Virtual)")
-                if st.button("🎲 Rolar D20"):
-                    resultado_dado = rolar_dado()
-                    st.session_state["ultimo_dado"] = resultado_dado
-                if "ultimo_dado" in st.session_state:
-                    res = st.session_state["ultimo_dado"]
-                    st.metric("Resultado do Dado", res)
-                    if res >= 10:
-                        st.success("SUCESSO NO DADO!")
-                    else:
-                        st.error("FALHA NO DADO!")
+        # Linha do Tempo
+        st.divider()
+        st.subheader("📜 História até aqui...")
+        for item in reversed(st.session_state.historico[:-1]):
+            with st.expander(f"Cena: {item['heroi']}"):
+                st.write(item["texto"])
 
-            with col_pergunta:
-                st.markdown("#### 📖 Opção B: Desafio do Livro")
-                if st.button("❓ Gerar Pergunta sobre o Livro do Aluno"):
-                    with st.spinner(f"Gerando enigma sobre '{aluno_selecionado['livro']}'..."):
-                        q = gerar_pergunta_livro(gemini_key, aluno_selecionado['livro'], faixa_etaria)
-                        st.session_state["pergunta_atual"] = q
-                
-                if "pergunta_atual" in st.session_state:
-                    st.write(st.session_state["pergunta_atual"])
+    # =========================================================================
+    # TAB 2: PAINEL DE CONTROLE DO MESTRE (SEGUNDA TELA)
+    # =========================================================================
+    with tab_mestre:
+        st.header("🕹️ Controle Exclusivo do Mestre")
+        
+        if not is_ultima_rodada:
+            col_m1, col_m2 = st.columns(2)
+
+            with col_m1:
+                st.subheader("1. Sorteio do Herói")
+                if st.button("🎲 Sortear Próximo Aluno", type="primary"):
+                    if vivos:
+                        st.session_state.aluno_sorteado = random.choice(vivos)
+                        st.session_state.pergunta_atual = None
+                        st.session_state.pop("ultimo_dado", None)
+                        st.rerun()
+
+                aluno_selecionado = st.selectbox(
+                    "Aluno em ação:",
+                    options=vivos,
+                    index=vivos.index(st.session_state.aluno_sorteado) if st.session_state.aluno_sorteado in vivos else 0,
+                    format_func=lambda j: f"{j['aluno']} ({j['personagem']})"
+                ) if vivos else None
+
+                if aluno_selecionado:
+                    st.session_state.aluno_sorteado = aluno_selecionado
+
+                    # Ação de Resgate/Poção
+                    if aluno_selecionado.get("tem_porcao_resgate") and congelados:
+                        st.warning(f"🧪 {aluno_selecionado['aluno']} tem uma Poção de Resgate!")
+                        aluno_salvar = st.selectbox("Descongelar colega:", options=congelados, format_func=lambda x: x["aluno"])
+                        if st.button("Usar Poção de Resgate"):
+                            aluno_salvar["status"] = "VIVO"
+                            aluno_selecionado["tem_porcao_resgate"] = False
+                            st.success(f"{aluno_salvar['aluno']} voltou ao jogo!")
+                            st.rerun()
+
+            with col_m2:
+                st.subheader("2. Resolução do Desafio")
+                if st.session_state.aluno_sorteado:
+                    # Dado
+                    if st.button("🎲 Rolar D20 (Sorte)"):
+                        st.session_state["ultimo_dado"] = rolar_dado()
+                    
+                    if "ultimo_dado" in st.session_state:
+                        st.write(f"Resultado do Dado: **{st.session_state['ultimo_dado']}**")
+
+                    # Pergunta do Livro com Gabarito
+                    if st.button("📖 Gerar Pergunta (Com Gabarito)"):
+                        with st.spinner("Gerando pergunta..."):
+                            q = gerar_pergunta_livro(gemini_key, st.session_state.aluno_sorteado["livro"], faixa_etaria)
+                            st.session_state.pergunta_atual = q
+
+                    if st.session_state.pergunta_atual:
+                        st.warning("🔒 GABARITO DO MESTRE (Não mostrar aos alunos):")
+                        st.markdown(st.session_state.pergunta_atual)
 
             st.divider()
-            
-            # Resolução da Rodada
-            st.markdown("#### 📝 Decisão do Mestre:")
-            c_res1, c_res2 = st.columns(2)
-            
-            if c_res1.button("✅ O Aluno TEVE SUCESSO!", type="primary", use_container_width=True):
-                # Chance de 30% de ganhar item de resgate ao ter sucesso
+
+            # Botões de Decisão Final da Rodada
+            st.subheader("3. Decisão do Mestre")
+            col_b1, col_b2 = st.columns(2)
+
+            if aluno_selecionado and col_b1.button("✅ APROVAR SUCESSO DO ALUNO", type="primary", use_container_width=True):
                 if random.random() < 0.30:
                     aluno_selecionado["tem_porcao_resgate"] = True
-                    st.toast(f"✨ {aluno_selecionado['aluno']} encontrou uma Poção Mágica de Resgate!")
+                    st.toast(f"✨ {aluno_selecionado['aluno']} ganhou uma Poção de Resgate!")
 
                 contexto = (
                     f"Mundo da história: {st.session_state.mundo_mestre}. Rodada {st.session_state.rodada_atual}. "
                     f"O herói {aluno_selecionado['personagem']} (aluno {aluno_selecionado['aluno']}) usou seu item '{aluno_selecionado['item']}' "
-                    f"e sua habilidade '{aluno_selecionado['habilidade']}' para superar o obstáculo com SUCESSO!"
+                    f"e habilidade '{aluno_selecionado['habilidade']}' para superar o obstáculo com SUCESSO!"
                 )
-                
-                with st.spinner("Narrações e imagens sendo geradas..."):
+
+                with st.spinner("Gerando resultado na Tela da Turma..."):
                     narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto)
                     img = gerar_imagem(p_img, False, hf_token)
-                    
-                    st.session_state.roteiro_hq.append(f"CENA {st.session_state.rodada_atual}: [SUCESSO] Herói {aluno_selecionado['personagem']} usa {aluno_selecionado['item']}. Narrativa: {narrativa}")
+
+                    st.session_state.roteiro_hq.append(f"CENA {st.session_state.rodada_atual}: [SUCESSO] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": aluno_selecionado["personagem"]})
                     
                     st.session_state.rodada_atual += 1
                     st.session_state.aluno_sorteado = None
+                    st.session_state.pergunta_atual = None
                     st.rerun()
 
-            if c_res2.button("❌ O Aluno FALHOU!", use_container_width=True):
+            if aluno_selecionado and col_b2.button("❌ REGISTRAR FALHA (CONGELAR)", use_container_width=True):
                 for j in st.session_state.jogadores:
                     if j["aluno"] == aluno_selecionado["aluno"]:
                         j["status"] = "CONGELADO"
-                
+
                 contexto = (
                     f"Mundo da história: {st.session_state.mundo_mestre}. Rodada {st.session_state.rodada_atual}. "
-                    f"O herói {aluno_selecionado['personagem']} tentou usar o item '{aluno_selecionado['item']}', mas FALHOU! "
-                    f"Narre como ele foi congelado/capturado de forma mágica e sem violência."
+                    f"O herói {aluno_selecionado['personagem']} FALHOU. Narre como ele foi congelado de forma mágica e sem violência."
                 )
-                
-                with st.spinner("Narrações e imagens sendo geradas..."):
+
+                with st.spinner("Gerando resultado na Tela da Turma..."):
                     narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto)
                     img = gerar_imagem(p_img, False, hf_token)
-                    
-                    st.session_state.roteiro_hq.append(f"CENA {st.session_state.rodada_atual}: [FALHA] Herói {aluno_selecionado['personagem']} foi congelado. Narrativa: {narrativa}")
+
+                    st.session_state.roteiro_hq.append(f"CENA {st.session_state.rodada_atual}: [FALHA] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": aluno_selecionado["personagem"]})
                     
                     st.session_state.rodada_atual += 1
                     st.session_state.aluno_sorteado = None
+                    st.session_state.pergunta_atual = None
                     st.rerun()
 
-    else:
-        # Batalha Final / Conclusão
-        st.balloons()
-        st.header("🏆 BATALHA FINAL E CONCLUSÃO!")
-        
-        if st.button("🎬 Gerar Gran Finale em Pixel Art 16-bits!", type="primary"):
-            contexto = f"Mundo da história: {st.session_state.mundo_mestre}. Esta é a vitória final de todos os heróis reunidos!"
-            with st.spinner("Criando a tela de vitória final..."):
-                narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto, is_final=True)
-                img_final = gerar_imagem(p_img, is_final=True, token=hf_token)
-                
-                st.session_state.historico.append({"texto": narrativa, "img": img_final, "heroi": "TODOS OS HERÓIS REUNIDOS"})
-                st.session_state.roteiro_hq.append(f"CENA FINAL: Vitória Épica do Grupo. {narrativa}")
-                st.rerun()
+        else:
+            st.header("🏆 Finalizar Jogo")
+            if st.button("🎬 Gerar Gran Finale!", type="primary"):
+                contexto = f"Mundo da história: {st.session_state.mundo_mestre}. Vitória final de todos os heróis reunidos!"
+                with st.spinner("Criando cena final..."):
+                    narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto, is_final=True)
+                    img_final = gerar_imagem(p_img, is_final=True, token=hf_token)
 
-    # ---------------------------------------------------------------------------
-    # 7. EXIBIÇÃO DA HISTÓRIA E ROTEIRO EXPORTÁVEL
-    # ---------------------------------------------------------------------------
-    st.divider()
-    st.subheader("📖 Linha do Tempo e Roteiro da Aula")
-    
-    texto_roteiro = "\n\n".join(st.session_state.roteiro_hq)
-    st.download_button(
-        label="📥 Baixar Roteiro para HQ / Vídeo (TXT)",
-        data=texto_roteiro,
-        file_name="roteiro_hq_animacao.txt",
-        mime="text/plain"
-    )
+                    st.session_state.historico.append({"texto": narrativa, "img": img_final, "heroi": "TODOS OS HERÓIS REUNIDOS"})
+                    st.session_state.roteiro_hq.append(f"CENA FINAL: Vitória Épica. {narrativa}")
+                    st.rerun()
 
-    for h in reversed(st.session_state.historico):
-        with st.container():
-            col1, col2 = st.columns([2, 1])
-            with col1:
-                st.markdown(f"**Destaque:** {h['heroi']}")
-                st.write(h["texto"])
-            with col2:
-                if h["img"]:
-                    st.image(h["img"], use_container_width=True)
-            st.divider()
+        # Baixar Roteiro
+        st.divider()
+        texto_roteiro = "\n\n".join(st.session_state.roteiro_hq)
+        st.download_button(
+            label="📥 Baixar Roteiro Completo da Aula (TXT)",
+            data=texto_roteiro,
+            file_name="roteiro_hq_aula.txt",
+            mime="text/plain"
+        )
