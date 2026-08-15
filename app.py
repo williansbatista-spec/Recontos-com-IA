@@ -12,12 +12,12 @@ from huggingface_hub import InferenceClient
 # 1. CONFIGURAÇÃO DA PÁGINA
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="RPG Escolar - Multiverso da Leitura",
+    page_title="Multiverso da Leitura",
     page_icon="🎲",
     layout="wide"
 )
 
-st.title("🎲 RPG Escolar: O Multiverso da Leitura")
+st.title("🎲 No Multiverso da Leitura")
 
 # ---------------------------------------------------------------------------
 # 2. BARRA LATERAL: API & CONFIGURAÇÕES
