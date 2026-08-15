@@ -1,11 +1,9 @@
 import os
 import random
-import io
 import time
 import streamlit as st
 from google import genai
 from huggingface_hub import InferenceClient
-from PIL import Image
 
 # ---------------------------------------------------------------------------
 # 1. CONFIGURAÇÃO DA PÁGINA STREAMLIT
@@ -130,10 +128,11 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
     max_tentativas = 3
     for tentativa in range(max_tentativas):
         try:
-            # Força o uso do modelo estável que possui maior cota gratuita
-            response = client.models.generate_content(
+            # Nova chamada utilizando a Interactions API
+            response = client.interactions.create(
                 model="gemini-2.5-flash",
-                contents=f"{system_instruction}\n\nAção/Contexto: {prompt_usuario}"
+                config={"system_instruction": system_instruction},
+                contents=f"Ação/Contexto: {prompt_usuario}"
             )
             
             texto = response.text
