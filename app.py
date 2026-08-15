@@ -207,7 +207,7 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
 
     try:
         response = client.models.generate_content(
-            model='gemini-3.5-flash',
+            model='gemini-3.5-flash-lite',
             contents=prompt_contexto,
             config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
         )
