@@ -2,7 +2,8 @@ import os
 import random
 import time
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from huggingface_hub import InferenceClient
 
 # ---------------------------------------------------------------------------
@@ -52,18 +53,6 @@ with st.sidebar:
         
     if gemini_key and hf_token:
         st.success("🟢 Chaves de API Ativas!")
-        
-        try:
-            genai.configure(api_key=gemini_key)
-            modelos_permitidos = [m.name.replace('models/', '') for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-            with st.expander("🤖 Ver Modelos Liberados", expanded=False):
-                if modelos_permitidos:
-                    st.write(", ".join(modelos_permitidos))
-                else:
-                    st.warning("Nenhum modelo compatível encontrado para esta chave.")
-        except Exception as e:
-            st.error(f"Erro ao listar modelos: {e}")
-            
     else:
         st.warning("⚠️ Insira as chaves nos Secrets ou nos campos acima.")
     
@@ -119,7 +108,8 @@ def extrair_opcoes(texto_narrativa: str):
     return op1, op2
 
 def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orientacao_idade: str):
-    genai.configure(api_key=g_key)
+    # Inicializa o cliente na Interactions API oficial
+    client = genai.Client(api_key=g_key)
     
     system_instruction = f"""
     Você é o Mestre de um RPG pedagógico infantil.
@@ -138,13 +128,14 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
     max_tentativas = 3
     for tentativa in range(max_tentativas):
         try:
-            # USANDO O MODELO ESTÁVEL PRESENTE NA SUA CHAVE CORPORATIVA
-            model = genai.GenerativeModel(
-                model_name="gemini-2.5-flash",
-                system_instruction=system_instruction
+            # Chamada padrão exigida para os modelos 2.5
+            response = client.models.generate_content(
+                model='gemini-2.5-flash',
+                contents=f"Ação/Contexto: {prompt_usuario}",
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                ),
             )
-            
-            response = model.generate_content(f"Ação/Contexto: {prompt_usuario}")
             
             texto = response.text
             if "---" in texto:
@@ -156,7 +147,6 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
             return narrativa.strip(), prompt_img.strip()
 
         except Exception as e:
-            # Trata erro de limite de cota (429) e tenta novamente após 10s
             if ("429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)) and tentativa < max_tentativas - 1:
                 time.sleep(10)
                 continue
