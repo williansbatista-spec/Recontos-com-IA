@@ -53,6 +53,20 @@ with st.sidebar:
         st.info(f"📌 **Faixa etária:** {st.session_state.get('faixa_etaria', 'Ensino Fundamental I')}")
         st.info(f"📖 **Mundo Atual:** {st.session_state.get('mundo_mestre', 'Indefinido')}")
 
+        st.divider()
+        
+        # Botão para resetar o jogo sem perder as chaves de API
+        if st.button("🗑️ Encerrar e Reiniciar Jogo", type="primary", use_container_width=True):
+            chaves_para_limpar = [
+                "partida_iniciada", "jogadores", "mundo_mestre", 
+                "rodada_atual", "historico", "roteiro_hq", 
+                "aluno_sorteado", "pergunta_atual", "ultimo_dado"
+            ]
+            for chave in chaves_para_limpar:
+                if chave in st.session_state:
+                    del st.session_state[chave]
+            st.rerun()
+
 # ---------------------------------------------------------------------------
 # 3. ESTADO DA SESSÃO (SESSION STATE)
 # ---------------------------------------------------------------------------
@@ -74,7 +88,7 @@ if "pergunta_atual" not in st.session_state:
     st.session_state.pergunta_atual = None
 
 # ---------------------------------------------------------------------------
-# 4. FUNÇÕES AUXILIARES & IA
+# 4. FUNÇÕES AUXILIARES & IA (COM SISTEMA DE FALLBACK 1.5)
 # ---------------------------------------------------------------------------
 def rolar_dado():
     return random.randint(1, 20)
@@ -86,13 +100,11 @@ def obter_primeiro_nome(nome_completo):
     return str(nome_completo).strip().split()[0]
 
 def sortear_proximo_aluno_automatico(aluno_atual=None):
-    """Sorteia automaticamente o próximo aluno ativo/vivo"""
     vivos = [j for j in st.session_state.jogadores if j["status"] == "VIVO" and j.get("presente", True)]
     if not vivos:
         st.session_state.aluno_sorteado = None
         return
     
-    # Se houver mais de um vivo, sorteia alguém diferente do jogador atual
     if len(vivos) > 1 and aluno_atual:
         opcoes = [j for j in vivos if j["aluno"] != aluno_atual["aluno"]]
         st.session_state.aluno_sorteado = random.choice(opcoes)
@@ -100,7 +112,6 @@ def sortear_proximo_aluno_automatico(aluno_atual=None):
         st.session_state.aluno_sorteado = random.choice(vivos)
 
 def renderizar_painel_jogadores():
-    """Exibe o painel de heróis de forma compacta (no máximo 2 linhas)"""
     st.markdown("### 🛡️ Painel dos Heróis")
     
     jogadores_presentes = [j for j in st.session_state.jogadores if j.get("presente", True)]
@@ -110,16 +121,13 @@ def renderizar_painel_jogadores():
         st.info("Nenhum aluno cadastrado/presente.")
         return
 
-    # Garante no máximo 2 linhas
     cols_por_linha = math.ceil(total / 2)
     
-    # Linha 1
     cols_l1 = st.columns(cols_por_linha)
     for idx in range(cols_por_linha):
         if idx < total:
             exibir_card_compacto(cols_l1[idx], jogadores_presentes[idx])
             
-    # Linha 2
     if total > cols_por_linha:
         cols_l2 = st.columns(cols_por_linha)
         for idx in range(cols_por_linha, total):
@@ -128,7 +136,6 @@ def renderizar_painel_jogadores():
     st.divider()
 
 def exibir_card_compacto(coluna, j):
-    """Renderiza um único jogador de forma enxuta"""
     primeiro_nome = obter_primeiro_nome(j["aluno"])
     is_ativo = j["status"] == "VIVO"
     status_icon = "🛡️" if is_ativo else "🧊"
@@ -145,7 +152,6 @@ def exibir_card_compacto(coluna, j):
             st.markdown(f"⭐ **{status_icon} {primeiro_nome}**{item_str}")
         else:
             st.markdown(f"**{status_icon} {primeiro_nome}**{item_str}")
-        
         st.caption(f"🎭 {j['personagem']}")
 
 def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False):
@@ -174,20 +180,34 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False):
         prompt_contexto += " ESTA É A RODADA FINAL! Narre a grande vitória vitoriosa e épica da turma contra o desafio principal."
 
     try:
+        # TENTATIVA 1: MODELO PRINCIPAL (3.5 Flash)
         response = client.models.generate_content(
             model='gemini-3.5-flash',
             contents=prompt_contexto,
             config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
         )
         texto = response.text
-        if "---" in texto:
-            narrativa, prompt_img = texto.split("---", 1)
-        else:
-            narrativa = texto
-            prompt_img = "epic fantasy adventure scene for children's storybook"
-        return narrativa.strip(), prompt_img.strip()
     except Exception as e:
-        return f"Erro na narrativa: {e}", "fantasy adventure scene"
+        # TENTATIVA 2: BACKUP (1.5 Flash - Estável) EM CASO DE SPIKE
+        try:
+            st.toast("⚠️ Pico de acesso na API! Acionando o backup de estabilidade...", icon="⚡")
+            time.sleep(2) # Pequena pausa para a API respirar
+            response = client.models.generate_content(
+                model='gemini-1.5-flash', # Trocado para o 1.5 Flash (mais estável)
+                contents=prompt_contexto,
+                config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
+            )
+            texto = response.text
+        except Exception as e_lite:
+            return f"Erro na narrativa (Ambos os modelos falharam): {e_lite}", "fantasy adventure scene"
+
+    if "---" in texto:
+        narrativa, prompt_img = texto.split("---", 1)
+    else:
+        narrativa = texto
+        prompt_img = "epic fantasy adventure scene for children's storybook"
+    
+    return narrativa.strip(), prompt_img.strip()
 
 def gerar_imagem(prompt_text, is_final, token):
     try:
@@ -214,10 +234,17 @@ def gerar_pergunta_livro(g_key, livro, faixa):
     GABARITO: [Letra e Resposta Correta com explicação curta]
     """
     try:
+        # Tenta o modelo principal
         response = client.models.generate_content(model='gemini-3.5-flash', contents=prompt)
         return response.text
-    except Exception as e:
-        return f"Erro ao gerar pergunta: {e}"
+    except Exception:
+        try:
+            # Fallback para o 1.5 Flash com pequena pausa
+            time.sleep(2)
+            response = client.models.generate_content(model='gemini-1.5-flash', contents=prompt)
+            return response.text
+        except Exception as e_lite:
+            return f"Erro ao gerar pergunta: {e_lite}"
 
 # ---------------------------------------------------------------------------
 # 5. TELA DE CARREGAMENTO (IMPORTAÇÃO DO CSV)
@@ -295,7 +322,7 @@ if not st.session_state.partida_iniciada:
             st.error(f"Erro ao processar o arquivo CSV: {e}")
 
 # ---------------------------------------------------------------------------
-# 6. MODO DE VISUALIZAÇÃO (MESTRE OU PROJETOR VIA BARRA LATERAL)
+# 6. MODO DE VISUALIZAÇÃO (TUDO NA MESMA ABA)
 # ---------------------------------------------------------------------------
 else:
     modo_visao = st.sidebar.radio(
@@ -325,7 +352,12 @@ else:
 
         if st.session_state.historico:
             ultimo = st.session_state.historico[-1]
-            st.subheader(f"🎬 {ultimo['heroi']}")
+            
+            # Controle visual da rodada
+            rodada_visual = st.session_state.rodada_atual - 1 
+            if rodada_visual < 1: rodada_visual = 1
+            
+            st.subheader(f"🎬 RODADA {rodada_visual} | {ultimo['heroi']}")
             
             c_img, c_txt = st.columns([1, 1])
             with c_img:
@@ -351,12 +383,10 @@ else:
     else:
         st.header("🕹️ Controle Exclusivo do Mestre")
         
-        # --- EXIBE A HISTÓRIA ATUAL PARA O MESTRE ---
         if st.session_state.historico:
             with st.expander("📖 Leia a Situação Atual da História", expanded=True):
                 st.write(st.session_state.historico[-1]["texto"])
         
-        # --- GESTÃO DE PRESENÇA (Com fix de chave única) ---
         with st.expander("📋 Chamada de Alunos (Marque/Desmarque Faltantes)"):
             for idx, j in enumerate(st.session_state.jogadores):
                 col_p1, col_p2 = st.columns([3, 1])
@@ -415,7 +445,7 @@ else:
                     if "ultimo_dado" in st.session_state:
                         st.write(f"Resultado do Dado: **{st.session_state['ultimo_dado']}**")
 
-                    if st.button("📖 Gerar Pergunta sobre o Livro do Aluno"):
+                    if st.button("📖 Gerar Pergunta sobre o Livro"):
                         with st.spinner("Gerando pergunta..."):
                             q = gerar_pergunta_livro(
                                 gemini_key, 
@@ -430,18 +460,15 @@ else:
 
             st.divider()
 
-            # --- BOTÕES DE SUCESSO E FALHA COM MEMÓRIA DE CONTEXTO ---
             st.subheader("3. Decisão do Mestre & Avanço do Desafio")
             col_b1, col_b2 = st.columns(2)
 
-            if aluno_selecionado and col_b1.button("✅ APROVAR SUCESSO (Avançar História)", type="primary", use_container_width=True):
+            if aluno_selecionado and col_b1.button("✅ APROVAR SUCESSO", type="primary", use_container_width=True):
                 if random.random() < 0.30:
                     aluno_selecionado["tem_porcao_resgate"] = True
                     st.toast(f"✨ {obter_primeiro_nome(aluno_selecionado['aluno'])} ganhou uma Poção de Resgate!")
 
                 p_nome = obter_primeiro_nome(aluno_selecionado['aluno'])
-                
-                # Puxa o contexto da última cena (Amnésia da IA resolvida)
                 cena_anterior = st.session_state.historico[-1]['texto'] if st.session_state.historico else "Início da jornada."
 
                 contexto = (
@@ -451,7 +478,7 @@ else:
                     f"AÇÃO: O herói {aluno_selecionado['personagem']} (aluno {p_nome}) usou o item '{aluno_selecionado['item']}' "
                     f"e a habilidade '{aluno_selecionado['habilidade']}' e VENCEU o obstáculo da cena anterior! \n"
                     f"INSTRUÇÃO IMPORTANTE: Primeiro, narre brevemente como ele resolveu o obstáculo anterior. "
-                    f"EM SEGUIDA, a história avança: crie um PRÓXIMO DESAFIO/OBSTÁCULO totalmente novo que surge no caminho deles."
+                    f"EM SEGUIDA, a história avança: crie um PRÓXIMO DESAFIO totalmente novo no caminho deles."
                 )
 
                 with st.spinner("NARRANDO SUCESSO E GERANDO PRÓXIMO DESAFIO..."):
@@ -468,14 +495,12 @@ else:
                     sortear_proximo_aluno_automatico(aluno_selecionado)
                     st.rerun()
 
-            if aluno_selecionado and col_b2.button("❌ REGISTRAR FALHA (Congelar & Avançar)", use_container_width=True):
+            if aluno_selecionado and col_b2.button("❌ REGISTRAR FALHA", use_container_width=True):
                 for j in st.session_state.jogadores:
                     if j["aluno"] == aluno_selecionado["aluno"]:
                         j["status"] = "CONGELADO"
 
                 p_nome = obter_primeiro_nome(aluno_selecionado['aluno'])
-                
-                # Puxa o contexto da última cena (Amnésia da IA resolvida)
                 cena_anterior = st.session_state.historico[-1]['texto'] if st.session_state.historico else "Início da jornada."
 
                 contexto = (
@@ -483,7 +508,7 @@ else:
                     f"RODADA ATUAL: {st.session_state.rodada_atual} de {tot_rodadas}. "
                     f"CENA ANTERIOR: {cena_anterior} \n"
                     f"AÇÃO: O herói {aluno_selecionado['personagem']} (aluno {p_nome}) FALHOU ao tentar superar o obstáculo e foi congelado temporariamente (narrativa sem violência). \n"
-                    f"INSTRUÇÃO IMPORTANTE: Primeiro, narre a falha e o congelamento. EM SEGUIDA, aplique a regra do 'Fail Forward' (fracassar para frente): a história não para, a falha causa uma complicação nova ou o obstáculo evolui para um cenário pior, exigindo ação imediata do próximo herói."
+                    f"INSTRUÇÃO IMPORTANTE: Primeiro, narre a falha e o congelamento. EM SEGUIDA, aplique o 'Fail Forward': a falha causa uma complicação nova ou o obstáculo evolui para um cenário pior, exigindo ação imediata do próximo herói."
                 )
 
                 with st.spinner("REGISTRANDO FALHA E GERANDO PRÓXIMO DESAFIO..."):
