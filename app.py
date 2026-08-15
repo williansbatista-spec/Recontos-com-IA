@@ -229,7 +229,7 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
 def gerar_imagem(prompt_text, chave_api):
     if not chave_api:
         st.error("🚨 ERRO: A chave da API não chegou na função. Verifique seus Secrets!")
-        return None
+        st.stop() # PARA O APP AQUI
 
     url = "https://api.together.xyz/v1/images/generations"
     headers = {
@@ -262,11 +262,11 @@ def gerar_imagem(prompt_text, chave_api):
         # SE DER ERRO, VAI MOSTRAR NA TELA EXATAMENTE O MOTIVO:
         st.error(f"🚨 **ERRO DA API TOGETHER:** Código {response.status_code}")
         st.error(f"🔍 **Detalhes do Erro:** {response.text}")
-        return None
+        st.stop() # PARA O APP AQUI PARA NÃO APAGAR O ERRO COM RERUN
 
     except Exception as e:
         st.error(f"🚨 **ERRO DO PYTHON/SERVIDOR:** {e}")
-        return None
+        st.stop() # PARA O APP AQUI
 
 def gerar_pergunta_livro(g_key, livro, faixa):
     client = inicializar_cliente_gemini(g_key)
@@ -280,6 +280,7 @@ def gerar_pergunta_livro(g_key, livro, faixa):
     GABARITO: [Letra e Resposta Correta com explicação curta]
     """
     try:
+        # ATUALIZADO AQUI PARA GARANTIR A VERSÃO 3.5 FLASH-LITE
         response = client.models.generate_content(model='gemini-3.5-flash-lite', contents=prompt)
         return response.text
     except Exception as e:
