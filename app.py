@@ -224,11 +224,11 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False, 
     return narrativa.strip(), prompt_img.strip()
 
 # ===========================================================================
-# NOVA FUNÇÃO GERAR_IMAGEM COM TOGETHER AI (FLUX / SDXL)
+# NOVA FUNÇÃO GERAR_IMAGEM COM DIAGNÓSTICO DE ERRO (TOGETHER AI)
 # ===========================================================================
 def gerar_imagem(prompt_text, chave_api):
     if not chave_api:
-        st.toast("⚠️ Imagem pulada: Chave da API ausente.", icon="🚫")
+        st.error("🚨 ERRO: A chave da API não chegou na função. Verifique seus Secrets!")
         return None
 
     url = "https://api.together.xyz/v1/images/generations"
@@ -259,13 +259,13 @@ def gerar_imagem(prompt_text, chave_api):
                 elif "b64_json" in item:
                     return Image.open(io.BytesIO(base64.b64decode(item["b64_json"])))
                     
-        print(f"Erro Together API: {response.status_code} - {response.text}")
-        st.toast(f"⚠️ Erro ao gerar imagem (Status {response.status_code}).", icon="🚫")
+        # SE DER ERRO, VAI MOSTRAR NA TELA EXATAMENTE O MOTIVO:
+        st.error(f"🚨 **ERRO DA API TOGETHER:** Código {response.status_code}")
+        st.error(f"🔍 **Detalhes do Erro:** {response.text}")
         return None
 
     except Exception as e:
-        print(f"Exceção na chamada da imagem: {e}")
-        st.toast("⚠️ Falha na conexão com o serviço de imagem.", icon="🚫")
+        st.error(f"🚨 **ERRO DO PYTHON/SERVIDOR:** {e}")
         return None
 
 def gerar_pergunta_livro(g_key, livro, faixa):
@@ -280,7 +280,7 @@ def gerar_pergunta_livro(g_key, livro, faixa):
     GABARITO: [Letra e Resposta Correta com explicação curta]
     """
     try:
-        response = client.models.generate_content(model='gemini-3.5-flash-lite', contents=prompt)
+        response = client.models.generate_content(model='gemini-3.5-flash', contents=prompt)
         return response.text
     except Exception as e:
         return f"Erro ao gerar pergunta: {e}"
