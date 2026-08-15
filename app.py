@@ -188,7 +188,7 @@ def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False):
         )
         texto = response.text
     except Exception as e:
-        # TENTATIVA 2: BACKUP (1.5 Flash - Estável) EM CASO DE SPIKE
+        # TENTATIVA 2: BACKUP (3.5 Flash-lite - Estável) EM CASO DE SPIKE
         try:
             st.toast("⚠️ Pico de acesso na API! Acionando o backup de estabilidade...", icon="⚡")
             time.sleep(2) # Pequena pausa para a API respirar
