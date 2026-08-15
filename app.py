@@ -1,305 +1,302 @@
 import os
 import random
 import time
+import pandas as pd
 import streamlit as st
 from google import genai
 from google.genai import types
 from huggingface_hub import InferenceClient
 
 # ---------------------------------------------------------------------------
-# 1. CONFIGURAÇÃO DA PÁGINA STREAMLIT
+# 1. CONFIGURAÇÃO DA PÁGINA
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="RPG Escolar Interativo",
+    page_title="Os Mestre de Aventura",
     page_icon="🎲",
     layout="wide"
 )
 
-st.title("🎲 RPG Escolar Multimodal")
-st.subheader("Crie histórias e quadrinhos em tempo real para a sala de aula!")
+st.title("🎲 No Multiverso da Leitura")
+st.caption("Aventura Interativa Pelo Fantástico Mundo da Literatura")
 
 # ---------------------------------------------------------------------------
-# 2. DICIONÁRIOS DE CONFIGURAÇÃO
-# ---------------------------------------------------------------------------
-ESTILOS = {
-    "Desenho Animado 2D": "Children's book illustration, 2D flat cartoon style, vibrant colors",
-    "História em Quadrinhos (HQ)": "Comic book panel, vibrant comic book illustration, bold lines",
-    "Aquarela Infantil": "Watercolor painting for children's book, soft warm colors, whimsical style",
-    "Pixel Art (16-Bit)": "16-bit retro pixel art style, detailed video game scene, vibrant color palette"
-}
-
-FAIXAS_ETARIAS = {
-    "Educação Infantil (3 a 5 anos)": "Linguagem extremamente simples, lúdica, repetitiva, com rimas leves e tom acolhedor. Opções muito diretas.",
-    "Ensino Fundamental I - 1º ao 3º ano (6 a 8 anos)": "Linguagem simples, narrativa de aventura leve, vocabulário claro e frases curtas. Desafios intuitivos.",
-    "Ensino Fundamental I - 4º e 5º ano (9 a 10 anos)": "Linguagem dinâmica, aventura investigativa com enigmas simples de lógica/matemática e trabalho em equipe.",
-    "Ensino Fundamental II (11 a 14 anos)": "Tom mais épico e misterioso, vocabulário rico, dilemas éticos/estratégicos e desafios intelectuais mais elaborados."
-}
-
-# ---------------------------------------------------------------------------
-# 3. BARRA LATERAL: CONFIGURAÇÕES E CHAVES DE API
+# 2. BARRA LATERAL: API & CONFIGURAÇÕES
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.header("🔑 Configurações de API")
-    
-    # Tenta obter as chaves dos Secrets primeiro e limpa espaços vazios
     gemini_key = st.secrets.get("GEMINI_API_KEY", "").strip()
     hf_token = st.secrets.get("HF_TOKEN", "").strip()
 
-    # Se não encontrar nos Secrets, exibe os campos manuais
     if not gemini_key:
         gemini_key = st.text_input("Gemini API Key", type="password")
     if not hf_token:
         hf_token = st.text_input("Hugging Face Token", type="password")
-        
+
     if gemini_key and hf_token:
-        st.success("🟢 Chaves de API Ativas!")
+        st.success("🟢 APIs Conectadas!")
     else:
-        st.warning("⚠️ Insira as chaves nos Secrets ou nos campos acima.")
-    
-    st.divider()
-    st.header("🏫 Perfil da Turma")
-    faixa_selecionada = st.selectbox(
-        "Faixa Etária / Ano Escolar:",
-        options=list(FAIXAS_ETARIAS.keys()),
-        index=2
-    )
-    orientacao_etaria = FAIXAS_ETARIAS[faixa_selecionada]
+        st.warning("⚠️ Insira as chaves necessárias.")
 
-    st.header("🎨 Estilo Visual")
-    estilo_selecionado = st.selectbox(
-        "Estilo das ilustrações:",
-        options=list(ESTILOS.keys()),
-        index=0
-    )
-    prompt_estilo_base = ESTILOS[estilo_selecionado]
-    
     st.divider()
-    st.caption("Geração de imagens via Hugging Face (FLUX.1-schnell).")
+    st.header("⚙️ Parâmetros da Partida")
+    total_rodadas = st.slider("Duração (Número de Rodadas):", min_value=5, max_value=35, value=20)
+    faixa_etaria = st.selectbox(
+        "Faixa Etária:",
+        ["Ensino Fundamental I (1º ao 3º ano)", "Ensino Fundamental I (4º e 5º ano)", "Ensino Fundamental II"]
+    )
 
 # ---------------------------------------------------------------------------
-# 4. GERENCIAMENTO DE ESTADO (SESSÃO)
+# 3. ESTADO DA SESSÃO (SESSION STATE)
 # ---------------------------------------------------------------------------
+if "partida_iniciada" not in st.session_state:
+    st.session_state.partida_iniciada = False
+if "jogadores" not in st.session_state:
+    st.session_state.jogadores = []
+if "mundo_mestre" not in st.session_state:
+    st.session_state.mundo_mestre = ""
+if "rodada_atual" not in st.session_state:
+    st.session_state.rodada_atual = 1
 if "historico" not in st.session_state:
     st.session_state.historico = []
-
-if "votos_op1" not in st.session_state:
-    st.session_state.votos_op1 = 0
-
-if "votos_op2" not in st.session_state:
-    st.session_state.votos_op2 = 0
+if "roteiro_hq" not in st.session_state:
+    st.session_state.roteiro_hq = []
+if "aluno_da_vez" not in st.session_state:
+    st.session_state.aluno_da_vez = None
 
 # ---------------------------------------------------------------------------
-# 5. FUNÇÕES DE SUPORTE E IA
+# 4. FUNÇÕES AUXILIARES & IA
 # ---------------------------------------------------------------------------
-def extrair_opcoes(texto_narrativa: str):
-    """ Extrai 2 opções do texto gerado pelo Gemini """
-    linhas = [l.strip() for l in texto_narrativa.split("\n") if l.strip()]
-    op1, op2 = "Opção 1: Avançar com cuidado", "Opção 2: Procurar uma pista"
-    
-    opcoes_encontradas = []
-    for linha in linhas:
-        if linha.startswith("1.") or linha.startswith("1-") or "1)" in linha or "Opção 1" in linha:
-            opcoes_encontradas.append(linha)
-        elif linha.startswith("2.") or linha.startswith("2-") or "2)" in linha or "Opção 2" in linha:
-            opcoes_encontradas.append(linha)
-            
-    if len(opcoes_encontradas) >= 2:
-        return opcoes_encontradas[0], opcoes_encontradas[1]
-    return op1, op2
+def rolar_dado():
+    return random.randint(1, 20)
 
-def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orientacao_idade: str):
-    # Inicializa o cliente na Interactions API oficial
-    client = genai.Client(api_key=g_key)
+def inicializar_cliente_gemini(key):
+    return genai.Client(api_key=key)
+
+def gerar_narrativa_rpg(g_key, prompt_contexto, is_final=False):
+    client = inicializar_cliente_gemini(g_key)
     
-    system_instruction = f"""
-    Você é o Mestre de um RPG pedagógico infantil.
-    DIRETRIZ DE PÚBLICO-ALVO: {orientacao_idade}
-    
-    Responda em duas partes estritamente divididas por '---':
-    Parte 1: A narrativa da história em até 2 parágrafos curtos. Termine SEMPRE com 2 opções bem claras numeradas para os alunos escolherem:
-    1. [Descrição da Opção 1]
-    2. [Descrição da Opção 2]
-    ---
-    Parte 2: Escreva APENAS o prompt em inglês para o gerador de imagens, sem nenhum rótulo como 'Parte 2:'.
-    Exemplo do formato esperado:
-    {estilo_prefixo}: [descrição detalhada e colorida da cena visualmente, sem texto na imagem]
+    instrucao_mestre = f"""
+    Você é o Mestre de um RPG pedagógico infantil para a faixa etária: {faixa_etaria}.
+    REGRAS RÍGIDAS:
+    1. Jamais use termos de morte ou violência real. Alunos derrotados são apenas 'congelados', 'capturados' ou 'expulsos da área'.
+    2. Responda ESTRITAMENTE em duas partes separadas por '---':
+    Parte 1: A narrativa em até 2 parágrafos envolventes.
+    Parte 2: O prompt em inglês detalhado para a imagem da cena.
     """
     
-    max_tentativas = 3
-    for tentativa in range(max_tentativas):
-        try:
-            # Chamada padrão exigida para os modelos 2.5
-            response = client.models.generate_content(
-                model='gemini-3.5-flash',
-                contents=f"Ação/Contexto: {prompt_usuario}",
-                config=types.GenerateContentConfig(
-                    system_instruction=system_instruction,
-                ),
-            )
-            
-            texto = response.text
-            if "---" in texto:
-                narrativa, prompt_img = texto.split("---", 1)
-            else:
-                narrativa = texto
-                prompt_img = f"{estilo_prefixo}: storybook magical scene"
-                
-            return narrativa.strip(), prompt_img.strip()
+    if is_final:
+        prompt_contexto += " ESTA É A RODADA FINAL! Narre a grande vitória vitoriosa e épica da turma contra o desafio principal."
 
-        except Exception as e:
-            if ("429" in str(e) or "RESOURCE_EXHAUSTED" in str(e)) and tentativa < max_tentativas - 1:
-                time.sleep(10)
-                continue
-            else:
-                raise e
+    try:
+        response = client.models.generate_content(
+            model='gemini-3.5-flash',
+            contents=prompt_contexto,
+            config=types.GenerateContentConfig(system_instruction=instrucao_mestre)
+        )
+        texto = response.text
+        if "---" in texto:
+            narrativa, prompt_img = texto.split("---", 1)
+        else:
+            narrativa = texto
+            prompt_img = "epic fantasy adventure scene for children's storybook"
+        return narrativa.strip(), prompt_img.strip()
+    except Exception as e:
+        return f"Erro na narrativa: {e}", "fantasy adventure scene"
 
-def gerar_imagem_hf(prompt_img: str, estilo_prefixo: str, token: str):
-    """ Gera imagem via Hugging Face Serverless Inference (FLUX.1) """
+def gerar_imagem(prompt_text, is_final, token):
     try:
         client = InferenceClient(api_key=token)
-        prompt_completo = f"{prompt_img}, {estilo_prefixo}"
+        if is_final:
+            prompt_completo = "16-bit retro video game ending screen, pixel art, group of diverse young heroes posing victoriously, vibrant colors"
+        else:
+            prompt_completo = f"{prompt_text}, vibrant children storybook style, high quality"
         
-        image = client.text_to_image(
-            prompt_completo,
-            model="black-forest-labs/FLUX.1-schnell"
-        )
+        image = client.text_to_image(prompt_completo, model="black-forest-labs/FLUX.1-schnell")
         return image
-    except Exception as e:
-        st.warning(f"Não foi possível gerar a imagem no Hugging Face: {e}")
+    except Exception:
         return None
 
-def executar_rodada(acao_texto: str):
-    if not gemini_key or not gemini_key.strip():
-        st.error("Por favor, insira a chave de API do Gemini.")
-        return
-    if not hf_token or not hf_token.strip():
-        st.error("Por favor, insira o token da Hugging Face.")
-        return
-
-    with st.spinner("🧠 O Mestre está escrevendo a história e desenhando a cena..."):
-        try:
-            narrativa, prompt_img = gerar_narrativa(
-                acao_texto, 
-                gemini_key.strip(), 
-                prompt_estilo_base, 
-                orientacao_etaria
-            )
-            img_gerada = gerar_imagem_hf(prompt_img, prompt_estilo_base, hf_token.strip())
-            
-            st.session_state.historico.append({
-                "acao": acao_texto,
-                "narrativa": narrativa,
-                "imagem": img_gerada,
-                "estilo": estilo_selecionado,
-                "faixa": faixa_selecionada
-            })
-            
-            st.session_state.votos_op1 = 0
-            st.session_state.votos_op2 = 0
-            
-            st.success("Rodada gerada com sucesso!")
-            st.rerun()
-        except Exception as e:
-            st.error(f"Erro ao processar a rodada: {e}")
+def gerar_pergunta_livro(g_key, livro, faixa):
+    client = inicializar_cliente_gemini(g_key)
+    prompt = f"Gere uma pergunta simples de múltipla escolha sobre o livro '{livro}' adequada para {faixa}. Forneça a pergunta e a resposta correta no final."
+    try:
+        response = client.models.generate_content(model='gemini-3.5-flash', contents=prompt)
+        return response.text
+    except Exception as e:
+        return f"Erro ao gerar pergunta: {e}"
 
 # ---------------------------------------------------------------------------
-# 6. PAINEL PRINCIPAL: JOGO & VOTAÇÃO
+# 5. TELA DE CARREGAMENTO (IMPORTAÇÃO DO CSV)
 # ---------------------------------------------------------------------------
-
-if not st.session_state.historico:
-    st.info("👋 **Bem-vindo ao RPG Escolar!** Digite abaixo o tema ou o começo da história para iniciar a aventura.")
+if not st.session_state.partida_iniciada:
+    st.header("📂 1. Carregar Ficha da Turma (CSV)")
+    st.markdown("""
+    Envie um arquivo CSV com o cabeçalho: `Nome do Aluno`, `Livro Lido`, `Nome do Personagem`, `Habilidade`, `Item Mágico`.
+    """)
     
-    with st.form("form_inicio"):
-        contexto_inicial = st.text_area(
-            "Qual é o ponto de partida da aventura?",
-            placeholder="Ex: A turma de alunos encontrou um portal mágico escondido atrás do quadro negro da sala de aula..."
-        )
-        btn_iniciar = st.form_submit_button("🚀 Começar Aventura", use_container_width=True)
+    csv_file = st.file_uploader("Escolha o arquivo CSV", type=["csv"])
+    
+    if csv_file:
+        df = pd.read_csv(csv_file)
+        st.dataframe(df.head(), use_container_width=True)
         
-        if btn_iniciar:
-            if not contexto_inicial.strip():
-                st.warning("Escreva uma introdução para começar!")
-            else:
-                executar_rodada(contexto_inicial)
+        if st.button("🚀 Iniciar Aventura!", type="primary"):
+            jogadores = []
+            for _, row in df.iterrows():
+                jogadores.append({
+                    "aluno": str(row["Nome do Aluno"]),
+                    "livro": str(row["Livro Lido"]),
+                    "personagem": str(row["Nome do Personagem"]),
+                    "habilidade": str(row["Habilidade"]),
+                    "item": str(row["Item Mágico"]),
+                    "status": "VIVO",
+                    "item_resgate": False
+                })
+            
+            st.session_state.jogadores = jogadores
+            livros_disponiveis = list(set([j["livro"] for j in jogadores]))
+            st.session_state.mundo_mestre = random.choice(livros_disponiveis)
+            st.session_state.partida_iniciada = True
+            st.rerun()
 
+# ---------------------------------------------------------------------------
+# 6. PAINEL DO JOGO (PARTIDA ATIVA)
+# ---------------------------------------------------------------------------
 else:
-    ultima_narrativa = st.session_state.historico[-1]["narrativa"]
-    op1_texto, op2_texto = extrair_opcoes(ultima_narrativa)
-
-    st.markdown("### 🗳️ Votação para a Próxima Ação")
+    # Cabeçalho de Status
+    c_head1, c_head2, c_head3 = st.columns(3)
+    c_head1.metric("Mundo Mestre", st.session_state.mundo_mestre)
+    c_head2.metric("Rodada", f"{st.session_state.rodada_atual} / {total_rodadas}")
     
-    col1, col2 = st.columns(2)
+    vivos = sum(1 for j in st.session_state.jogadores if j["status"] == "VIVO")
+    c_head3.metric("Alunos Ativos", f"{vivos} / {len(st.session_state.jogadores)}")
     
-    with col1:
-        st.info(f"**{op1_texto}**")
-        if st.button("👍 Votar na Opção 1", key="btn_voto_1", use_container_width=True):
-            st.session_state.votos_op1 += 1
-            st.rerun()
-        st.metric("Total de Votos", st.session_state.votos_op1)
-
-    with col2:
-        st.warning(f"**{op2_texto}**")
-        if st.button("👍 Votar na Opção 2", key="btn_voto_2", use_container_width=True):
-            st.session_state.votos_op2 += 1
-            st.rerun()
-        st.metric("Total de Votos", st.session_state.votos_op2)
-
     st.divider()
 
-    col_enviar, col_limpar = st.columns([3, 1])
+    # Checagem de Fim de Jogo
+    is_ultima_rodada = st.session_state.rodada_atual >= total_rodadas
 
-    with col_enviar:
-        if st.button("🏆 Finalizar Votação e Avançar História", type="primary", use_container_width=True):
-            v1 = st.session_state.votos_op1
-            v2 = st.session_state.votos_op2
+    # Painel de Seleção do Herói da Rodada
+    if not is_ultima_rodada:
+        st.subheader("🎯 Desafio da Rodada")
+        
+        aluno_selecionado = st.selectbox(
+            "Escolha o aluno para enfrentar o desafio:",
+            options=[j for j in st.session_state.jogadores if j["status"] == "VIVO"],
+            format_func=lambda j: f"{j['aluno']} ({j['personagem']}) - Item: {j['item']}"
+        )
+        
+        if aluno_selecionado:
+            st.info(f"👉 **Personagem:** {aluno_selecionado['personagem']} | **Habilidade:** {aluno_selecionado['habilidade']} | **Item:** {aluno_selecionado['item']}")
             
-            if v1 > v2:
-                escolha = f"A maioria da turma escolheu a Opção 1: {op1_texto}"
-            elif v2 > v1:
-                escolha = f"A maioria da turma escolheu a Opção 2: {op2_texto}"
-            else:
-                escolha = f"Houve empate nos votos! O Mestre decidiu seguir com a Opção 1: {op1_texto}"
+            col_dado, col_pergunta = st.columns(2)
+            
+            with col_dado:
+                st.markdown("#### 🎲 Opção A: Teste de Sorte (Dado Virtual)")
+                if st.button("🎲 Rolar D20"):
+                    resultado_dado = rolar_dado()
+                    st.session_state["ultimo_dado"] = resultado_dado
+                if "ultimo_dado" in st.session_state:
+                    res = st.session_state["ultimo_dado"]
+                    st.metric("Resultado do Dado", res)
+                    if res >= 10:
+                        st.success("SUCESSO NO DADO!")
+                    else:
+                        st.error("FALHA NO DADO!")
+
+            with col_pergunta:
+                st.markdown("#### 📖 Opção B: Desafio do Livro")
+                if st.button("❓ Gerar Pergunta sobre o Livro"):
+                    with st.spinner("Gerando pergunta..."):
+                        q = gerar_pergunta_livro(gemini_key, aluno_selecionado['livro'], faixa_etaria)
+                        st.session_state["pergunta_atual"] = q
                 
-            executar_rodada(escolha)
+                if "pergunta_atual" in st.session_state:
+                    st.write(st.session_state["pergunta_atual"])
 
-    with col_limpar:
-        if st.button("🔄 Zerar Placar", use_container_width=True):
-            st.session_state.votos_op1 = 0
-            st.session_state.votos_op2 = 0
-            st.rerun()
+            st.divider()
+            
+            # Resolução da Rodada
+            st.markdown("#### 📝 Decisão do Mestre:")
+            c_res1, c_res2 = st.columns(2)
+            
+            if c_res1.button("✅ O Aluno TEVE SUCESSO!", type="primary", use_container_width=True):
+                contexto = (
+                    f"Mundo da história: {st.session_state.mundo_mestre}. Rodada {st.session_state.rodada_atual}. "
+                    f"O herói {aluno_selecionado['personagem']} (aluno {aluno_selecionado['aluno']}) usou seu item '{aluno_selecionado['item']}' "
+                    f"e sua habilidade '{aluno_selecionado['habilidade']}' para superar o obstáculo com SUCESSO!"
+                )
+                
+                with st.spinner("Narrações e imagens sendo geradas..."):
+                    narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto)
+                    img = gerar_imagem(p_img, False, hf_token)
+                    
+                    # Salva no Roteiro
+                    st.session_state.roteiro_hq.append(f"CENA {st.session_state.rodada_atual}: [SUCESSO] Herói {aluno_selecionado['personagem']} usa {aluno_selecionado['item']}. Narrativa: {narrativa}")
+                    st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": aluno_selecionado["personagem"]})
+                    
+                    st.session_state.rodada_atual += 1
+                    st.rerun()
 
-    with st.expander("✍️ Ou digite uma ação personalizada (Ação Livre)"):
-        with st.form("form_livre"):
-            acao_custom = st.text_input("Ação customizada da turma:")
-            btn_custom = st.form_submit_button("🎮 Enviar Ação Livre")
-            if btn_custom and acao_custom.strip():
-                executar_rodada(acao_custom)
+            if c_res2.button("❌ O Aluno FALHOU!", use_container_width=True):
+                # Marca aluno como congelado
+                for j in st.session_state.jogadores:
+                    if j["aluno"] == aluno_selecionado["aluno"]:
+                        j["status"] = "CONGELADO"
+                
+                contexto = (
+                    f"Mundo da história: {st.session_state.mundo_mestre}. Rodada {st.session_state.rodada_atual}. "
+                    f"O herói {aluno_selecionado['personagem']} tentou usar o item '{aluno_selecionado['item']}', mas FALHOU! "
+                    f"Narre como ele foi congelado/capturado de forma mágica e sem violência."
+                )
+                
+                with st.spinner("Narrações e imagens sendo geradas..."):
+                    narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto)
+                    img = gerar_imagem(p_img, False, hf_token)
+                    
+                    st.session_state.roteiro_hq.append(f"CENA {st.session_state.rodada_atual}: [FALHA] Herói {aluno_selecionado['personagem']} foi congelado. Narrativa: {narrativa}")
+                    st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": aluno_selecionado["personagem"]})
+                    
+                    st.session_state.rodada_atual += 1
+                    st.rerun()
 
-# ---------------------------------------------------------------------------
-# 7. EXIBIÇÃO DO HISTÓRICO DA HISTÓRIA
-# ---------------------------------------------------------------------------
-if st.session_state.historico:
+    else:
+        # Batalha Final / Conclusão
+        st.balloons()
+        st.header("🏆 BATALHA FINAL E CONCLUSÃO!")
+        
+        if st.button("🎬 Gerar Gran Finale em Pixel Art 16-bits!", type="primary"):
+            contexto = f"Mundo da história: {st.session_state.mundo_mestre}. Esta é a vitória final de todos os heróis reunidos!"
+            with st.spinner("Criando a tela de vitória final..."):
+                narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto, is_final=True)
+                img_final = gerar_imagem(p_img, is_final=True, token=hf_token)
+                
+                st.session_state.historico.append({"texto": narrativa, "img": img_final, "heroi": "TODOS"})
+                st.session_state.roteiro_hq.append(f"CENA FINAL: Vitória Épica do Grupo. {narrativa}")
+                st.rerun()
+
+    # ---------------------------------------------------------------------------
+    # 7. EXIBIÇÃO DA HISTÓRIA E ROTEIRO EXPORTÁVEL
+    # ---------------------------------------------------------------------------
     st.divider()
-    st.header("📖 Linha do Tempo da Aventura")
+    st.subheader("📖 Linha do Tempo e Roteiro da Aula")
     
-    for i, rodada in enumerate(reversed(st.session_state.historico)):
-        num_rodada = len(st.session_state.historico) - i
+    # Botão para baixar o roteiro completo
+    texto_roteiro = "\n\n".join(st.session_state.roteiro_hq)
+    st.download_button(
+        label="📥 Baixar Roteiro para HQ / Vídeo (TXT)",
+        data=texto_roteiro,
+        file_name="roteiro_hq_animacao.txt",
+        mime="text/plain"
+    )
+
+    for h in reversed(st.session_state.historico):
         with st.container():
-            st.markdown(f"### 📍 Rodada {num_rodada}")
-            c1, c2 = st.columns([1, 1])
-            
-            with c1:
-                st.markdown(f"**Ação decidida:** _{rodada['acao']}_")
-                st.markdown(rodada["narrativa"])
-            
-            with c2:
-                if rodada["imagem"]:
-                    st.image(
-                        rodada["imagem"], 
-                        caption=f"Cena {num_rodada} | Estilo: {rodada.get('estilo', 'Visual')}", 
-                        use_container_width=True
-                    )
-                else:
-                    st.info("🖼️ Imagem indisponível nesta rodada.")
-            
+            col1, col2 = st.columns([2, 1])
+            with col1:
+                st.markdown(f"**Destaque:** {h['heroi']}")
+                st.write(h["texto"])
+            with col2:
+                if h["img"]:
+                    st.image(h["img"], use_container_width=True)
             st.divider()
