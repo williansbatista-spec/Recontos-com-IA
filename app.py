@@ -38,11 +38,20 @@ with st.sidebar:
 
     st.divider()
     st.header("⚙️ Parâmetros da Partida")
-    total_rodadas = st.slider("Duração (Número de Rodadas):", min_value=5, max_value=35, value=20)
-    faixa_etaria = st.selectbox(
-        "Faixa Etária:",
-        ["Ensino Fundamental I (1º ao 3º ano)", "Ensino Fundamental I (4º e 5º ano)", "Ensino Fundamental II"]
-    )
+    
+    # Se a partida já começou, travamos estes campos para evitar bugs de estado
+    if not st.session_state.get("partida_iniciada", False):
+        total_rodadas = st.slider("Duração (Número de Rodadas):", min_value=5, max_value=35, value=20)
+        faixa_etaria = st.selectbox(
+            "Faixa Etária:",
+            ["Ensino Fundamental I (1º ao 3º ano)", "Ensino Fundamental I (4º e 5º ano)", "Ensino Fundamental II"]
+        )
+        st.session_state["total_rodadas"] = total_rodadas
+        st.session_state["faixa_etaria"] = faixa_etaria
+    else:
+        st.info(f"📌 **Rodadas totais:** {st.session_state.get('total_rodadas', 20)}")
+        st.info(f"📌 **Faixa etária:** {st.session_state.get('faixa_etaria', 'Ensino Fundamental I')}")
+        st.info(f"📖 **Mundo Atual (Fixo):** {st.session_state.get('mundo_mestre', 'Indefinido')}")
 
 # ---------------------------------------------------------------------------
 # 3. ESTADO DA SESSÃO (SESSION STATE)
@@ -75,18 +84,27 @@ def inicializar_cliente_gemini(key):
 
 def gerar_narrativa_rpg(g_key, prompt_contexto, is_intro=False, is_final=False):
     client = inicializar_cliente_gemini(g_key)
+    faixa = st.session_state.get("faixa_etaria", "Ensino Fundamental I")
     
     instrucao_mestre = f"""
-    Você é o Mestre de um RPG pedagógico infantil para a faixa etária: {faixa_etaria}.
-    REGRAS RÍGIDAS:
+    Você é o Mestre de um RPG pedagógico infantil para a faixa etária: {faixa}.
+    
+    REGRAS RÍGIDAS DE NARRATIVA:
     1. Jamais use termos de morte ou violência real. Alunos derrotados são apenas 'congelados', 'capturados' ou 'expulsos da área'.
-    2. Responda ESTRITAMENTE em duas partes separadas por '---':
-    Parte 1: A narrativa em até 2 parágrafos envolventes.
-    Parte 2: O prompt em inglês detalhado para a imagem da cena.
+    2. CONTINUIDADE DA HISTÓRIA: Resolva o desafio atual da rodada E IMEDIATAMENTE apresente o novo obstáculo/desafio que a turma enfrentará no próximo passo!
+    3. Mantenha a ambientação estritamente ligada ao livro base do mundo: '{st.session_state.get('mundo_mestre', '')}'.
+    
+    FORMATO DE RESPOSTA (ESTRITO):
+    Responda ESTRITAMENTE em duas partes separadas por '---':
+    Parte 1: A narrativa da resolução + apresentação do novo desafio (até 2 parágrafos).
+    Parte 2: O prompt em inglês detalhado e visual para a imagem da cena.
     """
     
     if is_intro:
-        prompt_contexto = f"INTRODUÇÃO DA AVENTURA: Apresente o reino fantástico do livro '{prompt_contexto}'. Descreva como a comitiva de heróis alunos chegou a este lugar e apresente o primeiro grande desafio no horizonte!"
+        prompt_contexto = (
+            f"INTRODUÇÃO DA AVENTURA: Apresente o reino fantástico do livro '{st.session_state.mundo_mestre}'. "
+            f"Descreva como a comitiva de heróis chegou a este lugar e apresente o primeiro grande desafio no horizonte!"
+        )
     elif is_final:
         prompt_contexto += " ESTA É A RODADA FINAL! Narre a grande vitória vitoriosa e épica da turma contra o desafio principal."
 
@@ -173,7 +191,7 @@ if not st.session_state.partida_iniciada:
                 st.success(f"🟢 {len(df)} alunos carregados com sucesso!")
                 st.dataframe(df, use_container_width=True)
                 
-                if st.button("🚀 Iniciar Aventura e Gerar Introdução!", type="primary"):
+                if st.button("🚀 Iniciar Aventura e Fixar Mundo!", type="primary"):
                     jogadores = []
                     for _, row in df.iterrows():
                         jogadores.append({
@@ -187,21 +205,22 @@ if not st.session_state.partida_iniciada:
                         })
                     
                     st.session_state.jogadores = jogadores
+                    
+                    # Sortear o Mundo Base ÚNICO para a história toda
                     livros_disponiveis = list(set([j["livro"] for j in jogadores]))
-                    mundo_sorteado = random.choice(livros_disponiveis)
-                    st.session_state.mundo_mestre = mundo_sorteado
+                    st.session_state.mundo_mestre = random.choice(livros_disponiveis)
 
                     # Gerar Prólogo / Introdução
-                    with st.spinner("O Mestre está criando o mundo da aventura..."):
-                        narrativa_intro, p_img = gerar_narrativa_rpg(gemini_key, mundo_sorteado, is_intro=True)
+                    with st.spinner(f"Criando o mundo de '{st.session_state.mundo_mestre}'..."):
+                        narrativa_intro, p_img = gerar_narrativa_rpg(gemini_key, st.session_state.mundo_mestre, is_intro=True)
                         img_intro = gerar_imagem(p_img, False, hf_token)
 
                         st.session_state.historico.append({
                             "texto": narrativa_intro,
                             "img": img_intro,
-                            "heroi": "Apresentação da Turma & Mundo Mestre"
+                            "heroi": f"Abertura da Jornada em {st.session_state.mundo_mestre}"
                         })
-                        st.session_state.roteiro_hq.append(f"INTRODUÇÃO AO MUNDO '{mundo_sorteado}': {narrativa_intro}")
+                        st.session_state.roteiro_hq.append(f"INTRODUÇÃO AO MUNDO '{st.session_state.mundo_mestre}': {narrativa_intro}")
 
                     st.session_state.partida_iniciada = True
                     st.rerun()
@@ -221,7 +240,8 @@ else:
 
     vivos = [j for j in st.session_state.jogadores if j["status"] == "VIVO"]
     congelados = [j for j in st.session_state.jogadores if j["status"] == "CONGELADO"]
-    is_ultima_rodada = st.session_state.rodada_atual >= total_rodadas
+    tot_rodadas = st.session_state.get("total_rodadas", 20)
+    is_ultima_rodada = st.session_state.rodada_atual >= tot_rodadas
 
     # =========================================================================
     # VISÃO 1: TELA DA TURMA (PROJETOR)
@@ -230,8 +250,8 @@ else:
         auto_refresh = st.checkbox("🔄 Atualização Automática da Projeção", value=True)
         
         col_p1, col_p2, col_p3 = st.columns(3)
-        col_p1.metric("🌍 Mundo Mestre", st.session_state.mundo_mestre)
-        col_p2.metric("⏳ Rodada", f"{st.session_state.rodada_atual} / {total_rodadas}")
+        col_p1.metric("🌍 Mundo Principal", st.session_state.mundo_mestre)
+        col_p2.metric("⏳ Rodada", f"{st.session_state.rodada_atual} / {tot_rodadas}")
         col_p3.metric("🛡️ Heróis Ativos", f"{len(vivos)} / {len(st.session_state.jogadores)}")
 
         st.divider()
@@ -239,10 +259,10 @@ else:
         # Destaque do Herói da Rodada
         if st.session_state.aluno_sorteado:
             h = st.session_state.aluno_sorteado
-            st.markdown(f"### ⭐ Herói em Destaque: **{h['aluno']}** como *{h['personagem']}*")
-            st.info(f"✨ **Item:** {h['item']} | 🪄 **Habilidade:** {h['habilidade']} | 📖 **Livro Base:** {h['livro']}")
+            st.markdown(f"### ⭐ Herói em Ação: **{h['aluno']}** como *{h['personagem']}*")
+            st.info(f"✨ **Item Mágico:** {h['item']} | 🪄 **Habilidade:** {h['habilidade']} | 📖 **Livro da Ficha:** {h['livro']}")
 
-        # Exibição do Último Evento / Imagem Principal
+        # Exibição da Última Cena da História
         if st.session_state.historico:
             ultimo = st.session_state.historico[-1]
             st.subheader(f"🎬 {ultimo['heroi']}")
@@ -252,12 +272,12 @@ else:
                 if ultimo["img"]:
                     st.image(ultimo["img"], use_container_width=True)
             with c_txt:
-                st.markdown("### Narrativa:")
+                st.markdown("### Narrativa Atual:")
                 st.write(ultimo["texto"])
 
         # Linha do Tempo
         st.divider()
-        st.subheader("📜 História até aqui...")
+        st.subheader("📜 Cenas Anteriores")
         for item in reversed(st.session_state.historico[:-1]):
             with st.expander(f"Cena: {item['heroi']}"):
                 st.write(item["texto"])
@@ -276,7 +296,7 @@ else:
             col_m1, col_m2 = st.columns(2)
 
             with col_m1:
-                st.subheader("1. Sorteio do Herói")
+                st.subheader("1. Sorteio do Herói da Rodada")
                 if st.button("🎲 Sortear Próximo Aluno", type="primary"):
                     if vivos:
                         st.session_state.aluno_sorteado = random.choice(vivos)
@@ -314,10 +334,14 @@ else:
                     if "ultimo_dado" in st.session_state:
                         st.write(f"Resultado do Dado: **{st.session_state['ultimo_dado']}**")
 
-                    # Pergunta do Livro com Gabarito
-                    if st.button("📖 Gerar Pergunta (Com Gabarito)"):
+                    # Pergunta baseada no livro do próprio aluno
+                    if st.button("📖 Gerar Pergunta sobre o Livro do Aluno"):
                         with st.spinner("Gerando pergunta..."):
-                            q = gerar_pergunta_livro(gemini_key, st.session_state.aluno_sorteado["livro"], faixa_etaria)
+                            q = gerar_pergunta_livro(
+                                gemini_key, 
+                                st.session_state.aluno_sorteado["livro"], 
+                                st.session_state.get("faixa_etaria", "Ensino Fundamental I")
+                            )
                             st.session_state.pergunta_atual = q
 
                     if st.session_state.pergunta_atual:
@@ -326,49 +350,54 @@ else:
 
             st.divider()
 
-            # Botões de Decisão Final da Rodada
-            st.subheader("3. Decisão do Mestre")
+            # Botões de Decisão Final da Rodada (Avançam a história)
+            st.subheader("3. Decisão do Mestre & Avanço do Desafio")
             col_b1, col_b2 = st.columns(2)
 
-            if aluno_selecionado and col_b1.button("✅ APROVAR SUCESSO DO ALUNO", type="primary", use_container_width=True):
+            if aluno_selecionado and col_b1.button("✅ APROVAR SUCESSO (Avançar História)", type="primary", use_container_width=True):
                 if random.random() < 0.30:
                     aluno_selecionado["tem_porcao_resgate"] = True
                     st.toast(f"✨ {aluno_selecionado['aluno']} ganhou uma Poção de Resgate!")
 
+                # Contexto rico para garantir a continuidade da história no mundo fixo
                 contexto = (
-                    f"Mundo da história: {st.session_state.mundo_mestre}. Rodada {st.session_state.rodada_atual}. "
-                    f"O herói {aluno_selecionado['personagem']} (aluno {aluno_selecionado['aluno']}) usou seu item '{aluno_selecionado['item']}' "
-                    f"e habilidade '{aluno_selecionado['habilidade']}' para superar o obstáculo com SUCESSO!"
+                    f"MUNDO BASE DA AVENTURA: '{st.session_state.mundo_mestre}'. "
+                    f"RODADA ATUAL: {st.session_state.rodada_atual} de {tot_rodadas}. "
+                    f"AÇÃO: O herói {aluno_selecionado['personagem']} (aluno {aluno_selecionado['aluno']}) usou o item '{aluno_selecionado['item']}' "
+                    f"e a habilidade '{aluno_selecionado['habilidade']}' (do livro {aluno_selecionado['livro']}) e VENCEU o obstáculo! "
+                    f"INSTRUÇÃO IMPORTANTE: Narre esse sucesso com empolgação e em seguida APRESENTE O PRÓXIMO DESAFIO/OBSTÁCULO que surge para o grupo no mundo '{st.session_state.mundo_mestre}'."
                 )
 
-                with st.spinner("Gerando resultado na Projeção..."):
+                with st.spinner("NARRANDO SUCESSO E GERANDO PRÓXIMO DESAFIO..."):
                     narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto)
                     img = gerar_imagem(p_img, False, hf_token)
 
-                    st.session_state.roteiro_hq.append(f"CENA {st.session_state.rodada_atual}: [SUCESSO] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
-                    st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": aluno_selecionado["personagem"]})
+                    st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [SUCESSO] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
+                    st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Sucesso de {aluno_selecionado['personagem']}"})
                     
                     st.session_state.rodada_atual += 1
                     st.session_state.aluno_sorteado = None
                     st.session_state.pergunta_atual = None
                     st.rerun()
 
-            if aluno_selecionado and col_b2.button("❌ REGISTRAR FALHA (CONGELAR)", use_container_width=True):
+            if aluno_selecionado and col_b2.button("❌ REGISTRAR FALHA (Congelar & Avançar)", use_container_width=True):
                 for j in st.session_state.jogadores:
                     if j["aluno"] == aluno_selecionado["aluno"]:
                         j["status"] = "CONGELADO"
 
                 contexto = (
-                    f"Mundo da história: {st.session_state.mundo_mestre}. Rodada {st.session_state.rodada_atual}. "
-                    f"O herói {aluno_selecionado['personagem']} FALHOU. Narre como ele foi congelado de forma mágica e sem violência."
+                    f"MUNDO BASE DA AVENTURA: '{st.session_state.mundo_mestre}'. "
+                    f"RODADA ATUAL: {st.session_state.rodada_atual} de {tot_rodadas}. "
+                    f"AÇÃO: O herói {aluno_selecionado['personagem']} FALHOU e foi congelado temporariamente. "
+                    f"INSTRUÇÃO IMPORTANTE: Narre o congelamento sem violência e APRESENTE O NOVO DESAFIO que continua ameaçando a turma no mundo '{st.session_state.mundo_mestre}'."
                 )
 
-                with st.spinner("Gerando resultado na Projeção..."):
+                with st.spinner("REGISTRANDO FALHA E GERANDO PRÓXIMO DESAFIO..."):
                     narrativa, p_img = gerar_narrativa_rpg(gemini_key, contexto)
                     img = gerar_imagem(p_img, False, hf_token)
 
-                    st.session_state.roteiro_hq.append(f"CENA {st.session_state.rodada_atual}: [FALHA] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
-                    st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": aluno_selecionado["personagem"]})
+                    st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [FALHA] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
+                    st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Falha de {aluno_selecionado['personagem']}"})
                     
                     st.session_state.rodada_atual += 1
                     st.session_state.aluno_sorteado = None
