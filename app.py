@@ -130,7 +130,7 @@ def gerar_narrativa(prompt_usuario: str, g_key: str, estilo_prefixo: str, orient
         try:
             # MÉTODO CORRETO E MODELO EXISTENTE (2.0-flash) COM O CONFIG
             response = client.models.generate_content(
-                model="gemini-2.0-flash",
+                model="gemini-1.5-flash",
                 contents=f"Ação/Contexto: {prompt_usuario}",
                 config={"system_instruction": system_instruction}
             )
