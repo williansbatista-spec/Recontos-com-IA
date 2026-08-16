@@ -26,7 +26,6 @@ st.title("🎲 RPG Escolar: O Multiverso da Leitura")
 # ---------------------------------------------------------------------------
 with st.sidebar:
     st.header("🔑 Configurações de API")
-    # Busca a chave diretamente no secrets
     together_key = st.secrets.get("TOGETHER_API_KEY", "").strip()
 
     if not together_key:
@@ -40,7 +39,6 @@ with st.sidebar:
     st.divider()
     st.header("⚙️ Parâmetros da Partida")
     
-    # Seletor de Modelo de Texto do Together AI
     modelo_together = st.selectbox(
         "🤖 Modelo da Narrativa (Together AI):",
         [
@@ -52,7 +50,6 @@ with st.sidebar:
     )
     st.session_state["modelo_together"] = modelo_together
 
-    # Seletor do Modelo de Imagem FLUX
     modelo_flux = st.selectbox(
         "🎨 Modelo de Imagem FLUX:",
         [
@@ -69,7 +66,6 @@ with st.sidebar:
             ["Ensino Fundamental I (1º ao 3º ano)", "Ensino Fundamental I (4º e 5º ano)", "Ensino Fundamental II"]
         )
         
-        # --- SELETOR DE ESTILO VISUAL FLUX ---
         estilo_arte = st.selectbox(
             "🎨 Estilo Visual das Imagens:",
             [
@@ -171,6 +167,20 @@ def renderizar_painel_jogadores():
         cols_l2 = st.columns(cols_por_linha)
         for idx in range(cols_por_linha, total):
             exibir_card_compacto(cols_l2[idx - cols_por_linha], jogadores_presentes[idx])
+
+    # Placar de Moedas
+    with st.expander("🏆 Placar Geral de Moedas", expanded=False):
+        df_placar = pd.DataFrame([
+            {
+                "Aluno": j["aluno"],
+                "Personagem": j["personagem"],
+                "Status": "🛡️ Vivo" if j["status"] == "VIVO" else "🧊 Congelado",
+                "Poção 🧪": "Sim" if j.get("tem_porcao_resgate") else "Não",
+                "Moedas 🪙": j.get("moedas", 0)
+            }
+            for j in st.session_state.jogadores
+        ]).sort_values(by="Moedas 🪙", ascending=False)
+        st.dataframe(df_placar, use_container_width=True, hide_index=True)
             
     st.divider()
 
@@ -185,12 +195,13 @@ def exibir_card_compacto(coluna, j):
     )
     
     item_str = " 🧪" if j.get("tem_porcao_resgate") else ""
+    moedas_str = f" 🪙{j.get('moedas', 0)}"
     
     with coluna:
         if is_sorteado:
-            st.markdown(f"⭐ **{status_icon} {primeiro_nome}**{item_str}")
+            st.markdown(f"⭐ **{status_icon} {primeiro_nome}**{item_str}{moedas_str}")
         else:
-            st.markdown(f"**{status_icon} {primeiro_nome}**{item_str}")
+            st.markdown(f"**{status_icon} {primeiro_nome}**{item_str}{moedas_str}")
         st.caption(f"🎭 {j['personagem']}")
 
 def gerar_narrativa_rpg(together_key, prompt_contexto, is_intro=False, is_final=False, herois_vivos=None, heroi_ativo=None):
@@ -210,7 +221,8 @@ def gerar_narrativa_rpg(together_key, prompt_contexto, is_intro=False, is_final=
     
     REGRAS RÍGIDAS DE NARRATIVA:
     1. Jamais use termos de morte ou violência real. Alunos derrotados são apenas 'congelados', 'capturados' ou 'expulsos da área'.
-    2. Mantenha a ambientação estritamente ligada ao livro base do mundo: '{st.session_state.get('mundo_mestre', '')}'.
+    2. NUNCA descongele ou salve um jogador congelado por conta própria na narrativa. O resgate ocorre exclusivamente quando outro jogador decide usar sua poção.
+    3. Quando o herói vence o desafio da rodada, TODA A COMITIVA de heróis avança junto para o próximo estágio/ambiente do mundo base: '{st.session_state.get('mundo_mestre', '')}'.
     
     FORMATO DE RESPOSTA (ESTRITO):
     Responda ESTRITAMENTE em duas partes separadas por '---':
@@ -229,7 +241,7 @@ def gerar_narrativa_rpg(together_key, prompt_contexto, is_intro=False, is_final=
             f"Descreva como a comitiva de heróis chegou a este lugar e apresente o primeiro grande desafio no horizonte!"
         )
     elif is_final:
-        prompt_contexto += " ESTA É A RODADA FINAL! Narre a grande vitória vitoriosa e épica da turma contra o desafio principal."
+        prompt_contexto += " ESTA É A CENA FINAL! Narre a grande celebração vitoriosa e épica da turma após cumprirem a jornada."
 
     try:
         response = client.chat.completions.create(
@@ -253,7 +265,6 @@ def gerar_narrativa_rpg(together_key, prompt_contexto, is_intro=False, is_final=
     
     return narrativa.strip(), prompt_img.strip()
 
-# --- GERAÇÃO DE IMAGEM FLUX VIA TOGETHER AI ---
 def gerar_imagem(prompt_text, together_key):
     if not together_key:
         return None
@@ -340,7 +351,6 @@ if not st.session_state.partida_iniciada:
 
             df.columns = df.columns.astype(str).str.strip()
             
-            # Mapeamento flexível de colunas
             col_map = {col.lower(): col for col in df.columns}
             c_aluno = col_map.get("nome do aluno") or col_map.get("aluno") or col_map.get("nome")
             c_livro = col_map.get("livro lido") or col_map.get("livro")
@@ -348,7 +358,6 @@ if not st.session_state.partida_iniciada:
             c_habilidade = col_map.get("habilidade")
             c_item = col_map.get("item mágico") or col_map.get("item magico") or col_map.get("item")
 
-            # Fallbacks inteligentes caso os nomes divirjam
             if not c_aluno and len(df.columns) > 0: c_aluno = df.columns[0]
             if not c_livro and len(df.columns) > 1: c_livro = df.columns[1]
             if not c_personagem and len(df.columns) > 2: c_personagem = df.columns[2]
@@ -372,6 +381,7 @@ if not st.session_state.partida_iniciada:
                             "item": str(row[c_item]),
                             "status": "VIVO",
                             "tem_porcao_resgate": False,
+                            "moedas": 0,
                             "presente": True
                         })
                     
@@ -418,7 +428,9 @@ else:
     vivos = [j for j in st.session_state.jogadores if j["status"] == "VIVO" and j.get("presente", True)]
     congelados = [j for j in st.session_state.jogadores if j["status"] == "CONGELADO" and j.get("presente", True)]
     tot_rodadas = st.session_state.get("total_rodadas", 20)
-    is_ultima_rodada = st.session_state.rodada_atual >= tot_rodadas
+    
+    is_chefe_rodada = (st.session_state.rodada_atual == tot_rodadas - 1)
+    is_ultima_rodada = (st.session_state.rodada_atual >= tot_rodadas)
 
     # =========================================================================
     # VISÃO 1: TELA DA TURMA (PROJETOR)
@@ -428,10 +440,10 @@ else:
         
         renderizar_painel_jogadores()
 
-        if st.session_state.aluno_sorteado and st.session_state.aluno_sorteado.get("presente", True):
+        if st.session_state.aluno_sorteado and st.session_state.aluno_sorteado.get("presente", True) and not is_chefe_rodada and not is_ultima_rodada:
             h = st.session_state.aluno_sorteado
             p_nome = obter_primeiro_nome(h['aluno'])
-            st.markdown(f"### ⭐ Herói em Ação: **{p_nome}** como *{h['personagem']}*")
+            st.markdown(f"### ⭐ Herói em Ação: **{p_nome}** como *{h['personagem']}* (🪙 {h.get('moedas', 0)} Moedas)")
             st.info(f"✨ **Item Mágico:** {h['item']} | 🪄 **Habilidade:** {h['habilidade']} | 📖 **Livro da Ficha:** {h['livro']}")
 
         if st.session_state.historico:
@@ -474,7 +486,7 @@ else:
             for idx, j in enumerate(st.session_state.jogadores):
                 col_p1, col_p2 = st.columns([3, 1])
                 with col_p1:
-                    st.write(f"**{j['aluno']}** ({j['personagem']})")
+                    st.write(f"**{j['aluno']}** ({j['personagem']}) - 🪙 {j.get('moedas', 0)} moedas")
                 with col_p2:
                     is_p = st.checkbox("Presente", value=j.get("presente", True), key=f"pres_{idx}_{j['aluno']}")
                     if is_p != j.get("presente", True):
@@ -485,7 +497,10 @@ else:
 
         renderizar_painel_jogadores()
         
-        if not is_ultima_rodada:
+        # ---------------------------------------------------------------------
+        # TURNO REGULAR (RODADAS NORMAIS)
+        # ---------------------------------------------------------------------
+        if not is_chefe_rodada and not is_ultima_rodada:
             col_m1, col_m2 = st.columns(2)
 
             with col_m1:
@@ -504,14 +519,41 @@ else:
                 if aluno_selecionado:
                     st.session_state.aluno_sorteado = aluno_selecionado
 
+                    # --- USAR POÇÃO DE DESCONGELAMENTO (GASTA O TURNO DO JOGADOR) ---
                     if aluno_selecionado.get("tem_porcao_resgate") and congelados:
-                        st.warning(f"🧪 {obter_primeiro_nome(aluno_selecionado['aluno'])} tem uma Poção de Resgate!")
-                        aluno_salvar = st.selectbox("Descongelar colega:", options=congelados, format_func=lambda x: obter_primeiro_nome(x["aluno"]))
-                        if st.button("Usar Poção de Resgate"):
+                        st.warning(f"🧪 {obter_primeiro_nome(aluno_selecionado['aluno'])} possui uma Poção de Descongelamento!")
+                        aluno_salvar = st.selectbox(
+                            "Escolha o colega para resgatar (Esta ação gastará seu turno no desafio):", 
+                            options=congelados, 
+                            format_func=lambda x: f"{obter_primeiro_nome(x['aluno'])} ({x['personagem']})"
+                        )
+                        if st.button("🧪 Usar Poção & Salvar Colega (Gasta o Turno)", type="primary"):
                             aluno_salvar["status"] = "VIVO"
                             aluno_selecionado["tem_porcao_resgate"] = False
-                            st.success(f"{obter_primeiro_nome(aluno_salvar['aluno'])} voltou ao jogo!")
-                            st.rerun()
+                            
+                            p_nome_resgatador = obter_primeiro_nome(aluno_selecionado['aluno'])
+                            p_nome_salvo = obter_primeiro_nome(aluno_salvar['aluno'])
+                            
+                            narrativa_resgate = (
+                                f"O herói {aluno_selecionado['personagem']} ({p_nome_resgatador}) utilizou seu turno inteiro e abriu sua valiosa Poção de Resgate! "
+                                f"Ao derramar o elixir mágico sobre {aluno_salvar['personagem']} ({p_nome_salvo}), o gelo se dissolveu imediatamente. "
+                                f"O colega resgatado está de volta à comitiva para prosseguir na jornada!"
+                            )
+                            p_img = f"{aluno_selecionado['personagem']} casting glowing rescue potion on frozen {aluno_salvar['personagem']}, {st.session_state.get('estilo_arte', '')}"
+                            
+                            with st.spinner("Registrando resgate e gerando cena com Together AI..."):
+                                img = gerar_imagem(p_img, together_key)
+                                st.session_state.historico.append({
+                                    "texto": narrativa_resgate,
+                                    "img": img,
+                                    "heroi": f"Resgate de {aluno_salvar['personagem']}"
+                                })
+                                st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [RESGATE] {aluno_selecionado['personagem']} usou poção para libertar {aluno_salvar['personagem']}.")
+                                st.session_state.rodada_atual += 1
+                                st.session_state.pergunta_atual = None
+                                st.session_state.pop("ultimo_dado", None)
+                                sortear_proximo_aluno_automatico(aluno_selecionado)
+                                st.rerun()
 
                 if st.button("🔄 Resortear Aluno Manualmente"):
                     sortear_proximo_aluno_automatico(st.session_state.aluno_sorteado)
@@ -546,7 +588,11 @@ else:
             st.subheader("3. Decisão do Mestre & Avanço do Desafio")
             col_b1, col_b2 = st.columns(2)
 
-            if aluno_selecionado and col_b1.button("✅ APROVAR SUCESSO", type="primary", use_container_width=True):
+            if aluno_selecionado and col_b1.button("✅ APROVAR SUCESSO (+3 Moedas)", type="primary", use_container_width=True):
+                # Ganha 3 moedas
+                aluno_selecionado["moedas"] = aluno_selecionado.get("moedas", 0) + 3
+                
+                # Chance de encontrar Poção
                 if random.random() < 0.30:
                     aluno_selecionado["tem_porcao_resgate"] = True
                     st.toast(f"✨ {obter_primeiro_nome(aluno_selecionado['aluno'])} ganhou uma Poção de Resgate!")
@@ -560,8 +606,8 @@ else:
                     f"CENA ANTERIOR: {cena_anterior} \n"
                     f"AÇÃO: O herói {aluno_selecionado['personagem']} (aluno {p_nome}) usou o item '{aluno_selecionado['item']}' "
                     f"e a habilidade '{aluno_selecionado['habilidade']}' e VENCEU o obstáculo da cena anterior! \n"
-                    f"INSTRUÇÃO IMPORTANTE: Primeiro, narre brevemente como ele resolveu o obstáculo anterior. "
-                    f"EM SEGUIDA, a história avança: crie um PRÓXIMO DESAFIO totalmente novo no caminho deles."
+                    f"INSTRUÇÃO IMPORTANTE: Primeiro, narre brevemente como ele superou o obstáculo. "
+                    f"EM SEGUIDA, toda a comitiva de heróis avança junto para o PRÓXIMO ESTÁGIO/DESAFIO do reino."
                 )
 
                 with st.spinner("Gerando história e imagem com FLUX (Together AI)..."):
@@ -595,8 +641,8 @@ else:
                     f"MUNDO BASE: '{st.session_state.mundo_mestre}'. "
                     f"RODADA ATUAL: {st.session_state.rodada_atual} de {tot_rodadas}. "
                     f"CENA ANTERIOR: {cena_anterior} \n"
-                    f"AÇÃO: O herói {aluno_selecionado['personagem']} (aluno {p_nome}) FALHOU ao tentar superar o obstáculo e foi congelado temporariamente (narrativa sem violência). \n"
-                    f"INSTRUÇÃO IMPORTANTE: Primeiro, narre a falha e o congelamento. EM SEGUIDA, aplique o 'Fail Forward': a falha causa uma complicação nova ou o obstáculo evolui para um cenário pior, exigindo ação imediata do próximo herói."
+                    f"AÇÃO: O herói {aluno_selecionado['personagem']} (aluno {p_nome}) FALHOU ao tentar superar o obstáculo e foi congelado temporariamente. \n"
+                    f"INSTRUÇÃO IMPORTANTE: Narre a falha e o congelamento. Lembre-se: NÃO descongele o jogador na história! Aplique o 'Fail Forward' criando uma complicação para o herói seguinte resolver."
                 )
 
                 vivos_restantes = [v for v in vivos if v['aluno'] != aluno_selecionado['aluno']]
@@ -620,11 +666,78 @@ else:
                     sortear_proximo_aluno_automatico(aluno_selecionado)
                     st.rerun()
 
+        # ---------------------------------------------------------------------
+        # PENÚLTIMA RODADA: CONFRONTO COM O CHEFE FINAL (TRIO)
+        # ---------------------------------------------------------------------
+        elif is_chefe_rodada:
+            st.error("🐉 **GRANDE BATALHA: O CHEFE FINAL DO REINO APARECEU!**")
+            
+            # Pista Anciã dos Itens Combinados
+            itens_vivos = list(set([j['item'] for j in vivos]))
+            random.seed(st.session_state.rodada_atual)
+            pista_combinada = random.sample(itens_vivos, min(3, len(itens_vivos)))
+            
+            st.info(
+                f"📜 **Pista Anciã do Mestre:** *'Para derrotar a força do Chefe Final, a profecia diz que o ataque deve combinar o uso de: **{', '.join(pista_combinada)}**!'*"
+            )
+
+            st.subheader("👥 Seleção do Trio de Heróis para a Investida:")
+            trio_selecionado = st.multiselect(
+                "Escolha os 3 heróis que liderarão o golpe contra o Chefe Final:",
+                options=vivos,
+                default=vivos[:3] if len(vivos) >= 3 else vivos,
+                format_func=lambda j: f"{obter_primeiro_nome(j['aluno'])} ({j['personagem']} - Item: {j['item']})"
+            )
+
+            if len(trio_selecionado) != 3:
+                st.warning("⚠️ Você precisa selecionar exatamente **3 heróis** para realizar a combinação perfeita de ataque!")
+            else:
+                col_c1, col_c2 = st.columns(2)
+                
+                if col_c1.button("🔥 APROVAR GOLPE DE MISERICÓRDIA NO CHEFE (+10 Moedas cada)", type="primary", use_container_width=True):
+                    # Bônus de 10 moedas para cada membro do trio
+                    for hero in trio_selecionado:
+                        hero["moedas"] = hero.get("moedas", 0) + 10
+
+                    nomes_trio = ", ".join([f"{h['personagem']} ({obter_primeiro_nome(h['aluno'])})" for h in trio_selecionado])
+                    
+                    contexto_boss = (
+                        f"MUNDO BASE: '{st.session_state.mundo_mestre}'. "
+                        f"O CHEFE FINAL FOI DERROTADO! O trio lendário {nomes_trio} uniu seus itens e habilidades em um ataque perfeito e venceu o Chefe do reino! "
+                        f"Narre em tom altamente triunfal o golpe decisivo que libertou todo o mundo e seus habitantes."
+                    )
+
+                    with st.spinner("NARRANDO DERRUBADA DO CHEFE FINAL COM TOGETHER AI..."):
+                        narrativa, p_img = gerar_narrativa_rpg(together_key, contexto_boss, is_final=False, herois_vivos=vivos)
+                        img = gerar_imagem(p_img, together_key)
+
+                        st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [CHEFE DERROTADO] Trio: {nomes_trio}. Narrativa: {narrativa}")
+                        st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Ataque Final do Trio ({nomes_trio})"})
+                        
+                        st.session_state.rodada_atual += 1
+                        st.rerun()
+
+                if col_c2.button("❌ ATAQUE DO TRIO FALHOU", use_container_width=True):
+                    contexto_boss_falha = (
+                        f"MUNDO BASE: '{st.session_state.mundo_mestre}'. "
+                        f"O trio tentou atacar o Chefe Final, mas a combinação falhou momentaneamente. O Chefe contra-atacou, mas a turma inteira se uniu para recuar e planejar o encerramento!"
+                    )
+                    with st.spinner("Gerando narrativa da batalha..."):
+                        narrativa, p_img = gerar_narrativa_rpg(together_key, contexto_boss_falha, is_final=False, herois_vivos=vivos)
+                        img = gerar_imagem(p_img, together_key)
+
+                        st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": "Investida contra o Chefe"})
+                        st.session_state.rodada_atual += 1
+                        st.rerun()
+
+        # ---------------------------------------------------------------------
+        # ÚLTIMA RODADA: FINALIZAÇÃO DA JORNADA
+        # ---------------------------------------------------------------------
         else:
             st.header("🏆 Finalizar Jogo")
-            if st.button("🎬 Gerar Gran Finale!", type="primary"):
-                contexto = f"Mundo da história: {st.session_state.mundo_mestre}. Vitória final de todos os heróis reunidos!"
-                with st.spinner("Criando cena final e imagem com Together AI..."):
+            if st.button("🎬 Gerar Gran Finale & Encerramento!", type="primary"):
+                contexto = f"Mundo da história: {st.session_state.mundo_mestre}. A vitória final de todos os heróis reunidos!"
+                with st.spinner("Criando grande cena final e imagem com Together AI..."):
                     narrativa, p_img = gerar_narrativa_rpg(
                         together_key, 
                         contexto, 
