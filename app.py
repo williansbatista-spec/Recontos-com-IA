@@ -46,14 +46,32 @@ st.sidebar.subheader("📋 Chamada da Turma")
 csv_file = st.sidebar.file_uploader("Carregar CSV da Turma", type=["csv"])
 
 players_df = None
+name_col = None
+
 if csv_file:
     try:
+        # Tenta separador ';' e faz fallback para ','
         players_df = pd.read_csv(csv_file, sep=";")
         if len(players_df.columns) <= 1:
             csv_file.seek(0)
             players_df = pd.read_csv(csv_file, sep=",")
         
+        # Limpa espaços em branco ocultos nos cabeçalhos
+        players_df.columns = players_df.columns.astype(str).str.strip()
+        
+        # Identificação inteligente da coluna com o nome dos alunos
+        possible_matches = ['nome', 'aluno', 'estudante', 'student', 'name']
+        for col in players_df.columns:
+            if col.lower() in possible_matches:
+                name_col = col
+                break
+        
+        # Se não encontrou palavra-chave, utiliza a primeira coluna do arquivo
+        if not name_col and len(players_df.columns) > 0:
+            name_col = players_df.columns[0]
+        
         st.sidebar.success(f"Carregados {len(players_df)} alunos com sucesso!")
+        st.sidebar.caption(f"📌 Coluna de alunos: **{name_col}**")
     except Exception as e:
         st.sidebar.error(f"Erro ao ler CSV: {e}")
 
@@ -161,11 +179,11 @@ else:
         st.subheader("🎲 Mecânicas da Turma")
         
         # Sorteio de Herói
-        if players_df is not None:
-            active_df = players_df[~players_df['Nome'].isin(st.session_state.frozen_players)]
+        if players_df is not None and name_col:
+            active_df = players_df[~players_df[name_col].isin(st.session_state.frozen_players)]
             if st.button("🎲 Sortear Herói Ativo"):
                 if not active_df.empty:
-                    chosen = random.choice(active_df['Nome'].tolist())
+                    chosen = random.choice(active_df[name_col].tolist())
                     st.success(f"Herói Escolhido: **{chosen}**!")
                 else:
                     st.warning("Todos os alunos ativos estão congelados!")
@@ -189,8 +207,8 @@ else:
         st.write(f"Poções Restantes: **{st.session_state.potions}**")
         
         # Congelar/Descongelar Manual
-        if players_df is not None:
-            student_to_freeze = st.selectbox("Congelar Aluno (Fail Forward):", players_df['Nome'].tolist())
+        if players_df is not None and name_col:
+            student_to_freeze = st.selectbox("Congelar Aluno (Fail Forward):", players_df[name_col].tolist())
             if st.button("Congelar Aluno"):
                 if student_to_freeze not in st.session_state.frozen_players:
                     st.session_state.frozen_players.append(student_to_freeze)
