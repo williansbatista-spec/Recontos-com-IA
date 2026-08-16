@@ -1,3 +1,5 @@
 streamlit
 pandas
-huggingface_hub
+openai
+requests
+Pillow
