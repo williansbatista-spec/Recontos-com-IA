@@ -2,9 +2,13 @@ import os
 import math
 import random
 import time
+import base64
+import io
+import requests
 import pandas as pd
 import streamlit as st
-from huggingface_hub import InferenceClient
+from openai import OpenAI
+from PIL import Image
 
 # ---------------------------------------------------------------------------
 # 1. CONFIGURAÇÃO DA PÁGINA
@@ -18,32 +22,45 @@ st.set_page_config(
 st.title("🎲 RPG Escolar: O Multiverso da Leitura")
 
 # ---------------------------------------------------------------------------
-# 2. BARRA LATERAL: API & CONFIGURAÇÕES
+# 2. BARRA LATERAL: API TOGETHER AI & CONFIGURAÇÕES
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.header("🔑 Configuração de API")
-    hf_token = st.secrets.get("HF_TOKEN", "").strip()
+    st.header("🔑 Configurações de API")
+    # Busca a chave diretamente no secrets
+    together_key = st.secrets.get("TOGETHER_API_KEY", "").strip()
 
-    if not hf_token:
-        hf_token = st.text_input("Hugging Face Token", type="password")
+    if not together_key:
+        together_key = st.text_input("Together AI API Key", type="password")
 
-    if hf_token:
-        st.success("🟢 API Conectada (Llama + FLUX)!")
+    if together_key:
+        st.success("🟢 Together AI Conectado (Llama + FLUX)!")
     else:
-        st.warning("⚠️ Insira o seu Hugging Face Token.")
+        st.warning("⚠️ Chave TOGETHER_API_KEY não encontrada nos Secrets ou no campo acima.")
 
     st.divider()
     st.header("⚙️ Parâmetros da Partida")
     
-    # Seletor do Modelo Llama
-    modelo_llama = st.selectbox(
-        "🤖 Modelo Llama:",
+    # Seletor de Modelo de Texto do Together AI
+    modelo_together = st.selectbox(
+        "🤖 Modelo da Narrativa (Together AI):",
         [
-            "meta-llama/Llama-3.3-70B-Instruct",
-            "meta-llama/Llama-3.1-8B-Instruct"
+            "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+            "deepseek-ai/DeepSeek-V3",
+            "Qwen/Qwen2.5-72B-Instruct-Turbo"
         ]
     )
-    st.session_state["modelo_llama"] = modelo_llama
+    st.session_state["modelo_together"] = modelo_together
+
+    # Seletor do Modelo de Imagem FLUX
+    modelo_flux = st.selectbox(
+        "🎨 Modelo de Imagem FLUX:",
+        [
+            "black-forest-labs/FLUX.1-schnell",
+            "black-forest-labs/FLUX.1-dev"
+        ]
+    )
+    st.session_state["modelo_flux"] = modelo_flux
     
     if not st.session_state.get("partida_iniciada", False):
         total_rodadas = st.slider("Duração (Número de Rodadas):", min_value=5, max_value=35, value=20)
@@ -75,7 +92,6 @@ with st.sidebar:
 
         st.divider()
         
-        # Botão para resetar o jogo sem perder as chaves de API
         if st.button("🗑️ Encerrar e Reiniciar Jogo", type="primary", use_container_width=True):
             chaves_para_limpar = [
                 "partida_iniciada", "jogadores", "mundo_mestre", 
@@ -108,13 +124,19 @@ if "pergunta_atual" not in st.session_state:
     st.session_state.pergunta_atual = None
 
 # ---------------------------------------------------------------------------
-# 4. FUNÇÕES AUXILIARES & IA (LLAMA & FLUX)
+# 4. FUNÇÕES AUXILIARES & IA (TOGETHER AI: LLAMA + FLUX)
 # ---------------------------------------------------------------------------
 def rolar_dado():
     return random.randint(1, 20)
 
 def obter_primeiro_nome(nome_completo):
     return str(nome_completo).strip().split()[0]
+
+def obter_cliente_together(api_key):
+    return OpenAI(
+        api_key=api_key,
+        base_url="https://api.together.xyz/v1"
+    )
 
 def sortear_proximo_aluno_automatico(aluno_atual=None):
     vivos = [j for j in st.session_state.jogadores if j["status"] == "VIVO" and j.get("presente", True)]
@@ -171,9 +193,9 @@ def exibir_card_compacto(coluna, j):
             st.markdown(f"**{status_icon} {primeiro_nome}**{item_str}")
         st.caption(f"🎭 {j['personagem']}")
 
-def gerar_narrativa_rpg(hf_token, prompt_contexto, is_intro=False, is_final=False, herois_vivos=None, heroi_ativo=None):
-    client = InferenceClient(api_key=hf_token)
-    modelo = st.session_state.get("modelo_llama", "meta-llama/Llama-3.3-70B-Instruct")
+def gerar_narrativa_rpg(together_key, prompt_contexto, is_intro=False, is_final=False, herois_vivos=None, heroi_ativo=None):
+    client = obter_cliente_together(together_key)
+    modelo = st.session_state.get("modelo_together", "meta-llama/Llama-3.3-70B-Instruct-Turbo")
     faixa = st.session_state.get("faixa_etaria", "Ensino Fundamental I")
     estilo = st.session_state.get("estilo_arte", "vibrant children storybook style")
     
@@ -221,7 +243,7 @@ def gerar_narrativa_rpg(hf_token, prompt_contexto, is_intro=False, is_final=Fals
         )
         texto = response.choices[0].message.content
     except Exception as e:
-        return f"Erro na narrativa (Llama): {e}", f"epic scene, {estilo}"
+        return f"Erro na narrativa (Together AI): {e}", f"epic scene, {estilo}"
 
     if "---" in texto:
         narrativa, prompt_img = texto.split("---", 1)
@@ -231,17 +253,45 @@ def gerar_narrativa_rpg(hf_token, prompt_contexto, is_intro=False, is_final=Fals
     
     return narrativa.strip(), prompt_img.strip()
 
-def gerar_imagem(prompt_text, hf_token):
+# --- GERAÇÃO DE IMAGEM FLUX VIA TOGETHER AI ---
+def gerar_imagem(prompt_text, together_key):
+    if not together_key:
+        return None
     try:
-        client = InferenceClient(api_key=hf_token)
-        image = client.text_to_image(prompt_text, model="black-forest-labs/FLUX.1-schnell")
-        return image
-    except Exception:
+        modelo_flux = st.session_state.get("modelo_flux", "black-forest-labs/FLUX.1-schnell")
+        url = "https://api.together.xyz/v1/images/generations"
+        payload = {
+            "model": modelo_flux,
+            "prompt": prompt_text,
+            "width": 1024,
+            "height": 768,
+            "steps": 4,
+            "n": 1,
+            "response_format": "b64_json"
+        }
+        headers = {
+            "Authorization": f"Bearer {together_key}",
+            "Content-Type": "application/json"
+        }
+        response = requests.post(url, json=payload, headers=headers, timeout=60)
+        response.raise_for_status()
+        data = response.json()
+        
+        if "data" in data and len(data["data"]) > 0:
+            item = data["data"][0]
+            if "b64_json" in item and item["b64_json"]:
+                img_bytes = base64.b64decode(item["b64_json"])
+                return Image.open(io.BytesIO(img_bytes))
+            elif "url" in item and item["url"]:
+                return item["url"]
+        return None
+    except Exception as e:
+        st.error(f"Erro ao gerar imagem no Together AI (FLUX): {e}")
         return None
 
-def gerar_pergunta_livro(hf_token, livro, faixa):
-    client = InferenceClient(api_key=hf_token)
-    modelo = st.session_state.get("modelo_llama", "meta-llama/Llama-3.3-70B-Instruct")
+def gerar_pergunta_livro(together_key, livro, faixa):
+    client = obter_cliente_together(together_key)
+    modelo = st.session_state.get("modelo_together", "meta-llama/Llama-3.3-70B-Instruct-Turbo")
     
     prompt = f"""
     Gere uma pergunta de múltipla escolha sobre o livro '{livro}' para a faixa etária {faixa}.
@@ -264,7 +314,7 @@ def gerar_pergunta_livro(hf_token, livro, faixa):
         )
         return response.choices[0].message.content
     except Exception as e:
-        return f"Erro ao gerar pergunta com Llama: {e}"
+        return f"Erro ao gerar pergunta com Together AI: {e}"
 
 # ---------------------------------------------------------------------------
 # 5. TELA DE CARREGAMENTO (IMPORTAÇÃO DO CSV)
@@ -333,14 +383,14 @@ if not st.session_state.partida_iniciada:
                     sortear_proximo_aluno_automatico()
                     vivos_agora = [j for j in st.session_state.jogadores if j["status"] == "VIVO" and j.get("presente", True)]
 
-                    with st.spinner(f"Criando o mundo de '{st.session_state.mundo_mestre}' com Llama..."):
+                    with st.spinner(f"Criando o mundo de '{st.session_state.mundo_mestre}' e gerando imagem no Together AI..."):
                         narrativa_intro, p_img = gerar_narrativa_rpg(
-                            hf_token, 
+                            together_key, 
                             st.session_state.mundo_mestre, 
                             is_intro=True,
                             herois_vivos=vivos_agora
                         )
-                        img_intro = gerar_imagem(p_img, hf_token)
+                        img_intro = gerar_imagem(p_img, together_key)
 
                         st.session_state.historico.append({
                             "texto": narrativa_intro,
@@ -479,9 +529,9 @@ else:
                         st.write(f"Resultado do Dado: **{st.session_state['ultimo_dado']}**")
 
                     if st.button("📖 Gerar Pergunta sobre o Livro"):
-                        with st.spinner("Gerando pergunta com Llama..."):
+                        with st.spinner("Gerando pergunta com Together AI..."):
                             q = gerar_pergunta_livro(
-                                hf_token, 
+                                together_key, 
                                 st.session_state.aluno_sorteado["livro"], 
                                 st.session_state.get("faixa_etaria", "Ensino Fundamental I")
                             )
@@ -514,14 +564,14 @@ else:
                     f"EM SEGUIDA, a história avança: crie um PRÓXIMO DESAFIO totalmente novo no caminho deles."
                 )
 
-                with st.spinner("NARRANDO SUCESSO E GERANDO PRÓXIMO DESAFIO COM LLAMA..."):
+                with st.spinner("Gerando história e imagem com FLUX (Together AI)..."):
                     narrativa, p_img = gerar_narrativa_rpg(
-                        hf_token, 
+                        together_key, 
                         contexto, 
                         herois_vivos=vivos, 
                         heroi_ativo=aluno_selecionado
                     )
-                    img = gerar_imagem(p_img, hf_token)
+                    img = gerar_imagem(p_img, together_key)
 
                     st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [SUCESSO] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Sucesso de {aluno_selecionado['personagem']}"})
@@ -551,14 +601,14 @@ else:
 
                 vivos_restantes = [v for v in vivos if v['aluno'] != aluno_selecionado['aluno']]
 
-                with st.spinner("REGISTRANDO FALHA E GERANDO PRÓXIMO DESAFIO COM LLAMA..."):
+                with st.spinner("Gerando falha e imagem com FLUX (Together AI)..."):
                     narrativa, p_img = gerar_narrativa_rpg(
-                        hf_token, 
+                        together_key, 
                         contexto, 
                         herois_vivos=vivos_restantes, 
                         heroi_ativo=aluno_selecionado
                     )
-                    img = gerar_imagem(p_img, hf_token)
+                    img = gerar_imagem(p_img, together_key)
 
                     st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [FALHA] {aluno_selecionado['personagem']}. Narrativa: {narrativa}")
                     st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Falha de {aluno_selecionado['personagem']}"})
@@ -574,14 +624,14 @@ else:
             st.header("🏆 Finalizar Jogo")
             if st.button("🎬 Gerar Gran Finale!", type="primary"):
                 contexto = f"Mundo da história: {st.session_state.mundo_mestre}. Vitória final de todos os heróis reunidos!"
-                with st.spinner("Criando cena final com Llama..."):
+                with st.spinner("Criando cena final e imagem com Together AI..."):
                     narrativa, p_img = gerar_narrativa_rpg(
-                        hf_token, 
+                        together_key, 
                         contexto, 
                         is_final=True,
                         herois_vivos=vivos
                     )
-                    img_final = gerar_imagem(p_img, hf_token=hf_token)
+                    img_final = gerar_imagem(p_img, together_key)
 
                     st.session_state.historico.append({"texto": narrativa, "img": img_final, "heroi": "TODOS OS HERÓIS REUNIDOS"})
                     st.session_state.roteiro_hq.append(f"CENA FINAL: Vitória Épica. {narrativa}")
