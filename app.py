@@ -765,7 +765,22 @@ else:
     is_chefe_rodada = (st.session_state.rodada_atual == tot_rodadas - 1)
     is_ultima_rodada = (st.session_state.rodada_atual >= tot_rodadas)
     # --- BARRA DE PROGRESSO AQUI ---
+   # --- BARRA DE PROGRESSO AQUI ---
     st.progress(min(st.session_state.rodada_atual / tot_rodadas, 1.0))
+
+    # --- DIFICULDADE PROPORCIONAL (INTERPOLAÇÃO) ---
+    dc_minima = 10
+    dc_maxima = 18
+    
+    if tot_rodadas <= 1:
+        dificuldade_alvo = dc_minima
+    else:
+        # Calcula a proporção do jogo concluída (de 0.0 a 1.0)
+        progresso = (st.session_state.rodada_atual - 1) / (tot_rodadas - 1)
+        # Interpola o valor e arredonda para o inteiro mais próximo
+        dificuldade_alvo = round(dc_minima + (progresso * (dc_maxima - dc_minima)))
+        
+    st.warning(f"🎯 **Dificuldade da Rodada:** O herói precisa tirar **{dificuldade_alvo}** ou mais no dado para vencer!")
 
     # 2. Exibição do Texto da Aventura e Imagem Gerada (MUITO IMPORTANTE: FICA NO TOPO DA TELA DA CENA)
     if st.session_state.historico:
