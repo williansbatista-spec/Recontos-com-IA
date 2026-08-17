@@ -53,7 +53,6 @@ def animar_rolagem_dado():
     val_final = rolar_dado()
     som_dado_url = "https://actions.google.com/sounds/v1/games/dice_roll.ogg"
 
-    # HTML/CSS minificado sem indentação para evitar que o Markdown transforme em bloco de código
     overlay_html = f'<audio autoplay style="display:none;"><source src="{som_dado_url}" type="audio/ogg"></audio><div id="dice-overlay" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background-color: rgba(0, 0, 0, 0.75); z-index: 99999; display: flex; flex-direction: column; justify-content: center; align-items: center; pointer-events: none; backdrop-filter: blur(5px);"><div style="position: relative; width: 280px; height: 280px; display: flex; justify-content: center; align-items: center; animation: spinAndScale 1.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards; filter: drop-shadow(0px 0px 35px rgba(255, 215, 0, 0.95));"><svg viewBox="0 0 100 100" style="width: 100%; height: 100%;"><polygon points="50,5 90,25 50,38" fill="#7e22ce" stroke="#ffd700" stroke-width="1.8"/><polygon points="50,5 10,25 50,38" fill="#6b21a8" stroke="#ffd700" stroke-width="1.8"/><polygon points="50,5 90,25 10,25" fill="#9333ea" stroke="#ffd700" stroke-width="1.8" opacity="0.7"/><polygon points="10,25 50,38 10,75" fill="#581c87" stroke="#ffd700" stroke-width="1.8"/><polygon points="90,25 90,75 50,38" fill="#a855f7" stroke="#ffd700" stroke-width="1.8"/><polygon points="10,75 50,38 50,95" fill="#3b0764" stroke="#ffd700" stroke-width="1.8"/><polygon points="90,75 50,95 90,75" fill="#7e22ce" stroke="#ffd700" stroke-width="1.8"/><polygon points="10,75 50,95 90,75" fill="#4c1d95" stroke="#ffd700" stroke-width="1.8"/></svg><div style="position: absolute; font-size: 80px; font-weight: 900; color: #FFFFFF; font-family: \'Arial Black\', sans-serif; text-shadow: 2px 2px 8px #000, -2px -2px 8px #000, 0px 0px 18px #ffd700; margin-top: 8px;">{val_final}</div></div></div><style>@keyframes spinAndScale {{ 0% {{ transform: scale(0.1) rotate(0deg) translateY(-300px); opacity: 0.1; }} 50% {{ transform: scale(1.5) rotate(720deg) translateY(0px); opacity: 0.95; }} 85% {{ transform: scale(1.2) rotate(1080deg); opacity: 0.95; }} 100% {{ transform: scale(1.0) rotate(1080deg); opacity: 0; }} }}</style>'
 
     placeholder = st.empty()
@@ -272,6 +271,30 @@ def gerar_imagem(prompt_text, together_key):
     except Exception as e:
         st.error(f"Erro ao gerar imagem no Together AI (FLUX): {e}")
         return None
+
+
+def gerar_pergunta_livro(together_key, livro, faixa_etaria):
+    if not together_key:
+        return "⚠️ Chave de API TOGETHER_API_KEY necessária para gerar perguntas."
+    try:
+        client = obter_cliente_together(together_key)
+        modelo = st.session_state.get(
+            "modelo_together", "meta-llama/Llama-3.3-70B-Instruct-Turbo"
+        )
+        prompt = (
+            f"Gere uma pergunta desafiadora e pedagógica sobre o livro '{livro}', "
+            f"adequada para alunos da faixa etária: {faixa_etaria}. A pergunta deve testar a "
+            f"compreensão de leitura do aluno de forma divertida e adequada para um RPG."
+        )
+        response = client.chat.completions.create(
+            model=modelo,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0.7,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Erro ao gerar pergunta: {e}"
 
 
 # ---------------------------------------------------------------------------
@@ -735,71 +758,69 @@ if not st.session_state.partida_iniciada:
 # 6. TELA DA PROJEÇÃO (TELA PRINCIPAL DA TURMA)
 # ---------------------------------------------------------------------------
 else:
-    # Painel dos Heróis no topo
+    # 1. Painel dos Heróis no topo
     renderizar_painel_jogadores()
 
     tot_rodadas = st.session_state.get("total_rodadas", 20)
-    is_chefe_rodada = st.session_state.rodada_atual == tot_rodadas - 1
-    is_ultima_rodada = st.session_state.rodada_atual >= tot_rodadas
+    is_chefe_rodada = (st.session_state.rodada_atual == tot_rodadas - 1)
+    is_ultima_rodada = (st.session_state.rodada_atual >= tot_rodadas)
 
-    # Botão para rolar o D20 e animar na tela
-    col_dado, col_espaco = st.columns([1, 3])
-    with col_dado:
-        if st.button("🎲 Rolar D20", type="primary", use_container_width=True):
-            resultado = animar_rolagem_dado()
-            st.session_state["ultimo_dado"] = resultado
+    # 2. Exibição do Texto da Aventura e Imagem Gerada (MUITO IMPORTANTE: FICA NO TOPO DA TELA DA CENA)
+    if st.session_state.historico:
+        ultima_cena = st.session_state.historico[-1]
+        st.markdown(f"### 🗺️ Cena Atual: **Rodada {st.session_state.rodada_atual}/{tot_rodadas}**")
+        
+        col_img, col_txt = st.columns([1, 1])
+        with col_img:
+            if ultima_cena.get("img"):
+                st.image(ultima_cena["img"], caption=ultima_cena.get("heroi", ""), use_container_width=True)
+        with col_txt:
+            st.markdown("#### 📜 Narrativa do Mestre")
+            st.write(ultima_cena.get("texto", ""))
 
-    if "ultimo_dado" in st.session_state:
-        st.success(
-            f"🎯 Último resultado do D20: **{st.session_state['ultimo_dado']}**"
-        )
+    st.divider()
 
-    # Informações do Herói em Ação
-    if (
-        st.session_state.aluno_sorteado
-        and st.session_state.aluno_sorteado.get("presente", True)
-        and not is_chefe_rodada
-        and not is_ultima_rodada
-    ):
+    # 3. Informações do Herói em Ação e Interações
+    if st.session_state.aluno_sorteado and st.session_state.aluno_sorteado.get("presente", True) and not is_chefe_rodada and not is_ultima_rodada:
         h = st.session_state.aluno_sorteado
-        p_nome = obter_primeiro_nome(h["aluno"])
-        st.markdown(
-            f"### ⭐ Herói em Ação: **{p_nome}** como *{h['personagem']}* (🪙 {h.get('moedas', 0)} Moedas)"
-        )
-        st.info(
-            f"✨ **Item Mágico:** {h['item']} | 🪄 **Habilidade:** {h['habilidade']} | 📖 **Livro Lido:** {h['livro']}"
-        )
+        p_nome = obter_primeiro_nome(h['aluno'])
+        
+        st.markdown(f"### ⭐ Herói em Ação: **{p_nome}** como *{h['personagem']}* (🪙 {h.get('moedas', 0)} Moedas)")
+        st.info(f"✨ **Item Mágico:** {h['item']} | 🪄 **Habilidade:** {h['habilidade']} | 📖 **Livro Lido:** {h['livro']}")
+
+        # 4. BOTÕES DE AÇÃO (FICAM ABAIXO DO TEXTO DA AVENTURA E DAS INFORMAÇÕES)
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("🎲 Rolar D20", use_container_width=True, type="primary"):
+                resultado = animar_rolagem_dado() 
+                st.session_state["ultimo_dado"] = resultado
+                st.rerun()
+
+        with col2:
+            if st.button("❓ Gerar Pergunta do Livro", use_container_width=True):
+                with st.spinner("O Mestre está consultando os pergaminhos..."):
+                    pergunta = gerar_pergunta_livro(together_key, h['livro'], st.session_state.get("faixa_etaria"))
+                    st.session_state.pergunta_atual = pergunta
+                st.rerun()
+
+        # 5. RESULTADOS DA ROLAGEM / PERGUNTA (FICAM LOGO ABAIXO DOS BOTÕES)
+        if "ultimo_dado" in st.session_state and st.session_state["ultimo_dado"] is not None:
+            st.success(f"🎲 O dado parou no número: **{st.session_state['ultimo_dado']}**")
+
+        if st.session_state.pergunta_atual:
+            st.markdown("### 📜 Desafio de Sabedoria")
+            st.info(st.session_state.pergunta_atual)
 
     # Apresentação do Chefe Final na Penúltima Rodada
     elif is_chefe_rodada:
         st.error("🐉 **GRANDE BATALHA: O CHEFE FINAL DO REINO APARECEU!**")
-        vivos = [
-            j
-            for j in st.session_state.jogadores
-            if j["status"] == "VIVO" and j.get("presente", True)
-        ]
-        itens_vivos = list(set([j["item"] for j in vivos]))
+        vivos = [j for j in st.session_state.jogadores if j["status"] == "VIVO" and j.get("presente", True)]
+        itens_vivos = list(set([j['item'] for j in vivos]))
         random.seed(st.session_state.rodada_atual)
         pista_combinada = random.sample(itens_vivos, min(3, len(itens_vivos)))
-        st.info(
-            f"📜 **Pista Anciã do Mestre:** *'Para derrotar o Chefe Final, o trio deve combinar: **{', '.join(pista_combinada)}**!'*"
-        )
+        st.info(f"📜 **Pista Anciã do Mestre:** *'Para derrotar o Chefe Final, o trio deve combinar: **{', '.join(pista_combinada)}**!'*")
 
-    # Exibição da Cena Atual
-    if st.session_state.historico:
-        ultimo = st.session_state.historico[-1]
-        st.subheader(f"📖 {ultimo['heroi']}")
-        st.write(ultimo["texto"])
-
-        if ultimo.get("img"):
-            if isinstance(ultimo["img"], str):
-                st.image(ultimo["img"], use_container_width=True)
-            else:
-                st.image(ultimo["img"], use_container_width=True)
-
-    # Histórico do jogo em um expander
-    with st.expander("📜 Histórico de Cenas", expanded=False):
-        for item in reversed(st.session_state.historico):
-            st.markdown(f"**{item['heroi']}**")
-            st.caption(item["texto"])
-            st.divider()
+    elif is_ultima_rodada:
+        st.balloons()
+        st.success("🎉 **A JORNADA FOI CONCLUÍDA COM SUCESSO! PARABÉNS AOS HERÓIS!**")
