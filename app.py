@@ -42,19 +42,19 @@ if "pergunta_atual" not in st.session_state:
     st.session_state.pergunta_atual = None
 
 # ---------------------------------------------------------------------------
-# 3. FUNÇÕES AUXILIARES, IA, SOM & ANIMAÇÃO DE DADOS
+# 3. FUNÇÕES AUXILIARES, IA, SOM & ANIMAÇÃO DE DADOS (D20 SVG)
 # ---------------------------------------------------------------------------
 def rolar_dado():
     return random.randint(1, 20)
 
 def animar_rolagem_dado():
-    """Gera o resultado e exibe um dado gigante rodando por cima da tela inteira com efeito sonoro."""
+    """Gera o resultado e exibe um D20 geométrico gigante rodando por cima da tela inteira com efeito sonoro."""
     val_final = rolar_dado()
     
-    # URL pública de áudio de rolagem de dados (Google Sound Library)
+    # Áudio público de rolar dados
     som_dado_url = "https://actions.google.com/sounds/v1/games/dice_roll.ogg"
 
-    # HTML/CSS e Audio injetados para animação em tela cheia com overlay
+    # HTML/CSS + SVG do D20
     overlay_html = f"""
     <audio autoplay style="display:none;">
         <source src="{som_dado_url}" type="audio/ogg">
@@ -65,7 +65,7 @@ def animar_rolagem_dado():
         left: 0;
         width: 100vw;
         height: 100vh;
-        background-color: rgba(0, 0, 0, 0.45);
+        background-color: rgba(0, 0, 0, 0.55);
         z-index: 99999;
         display: flex;
         flex-direction: column;
@@ -75,20 +75,36 @@ def animar_rolagem_dado():
         backdrop-filter: blur(4px);
     ">
         <div style="
-            font-size: 160px;
+            position: relative;
+            width: 280px;
+            height: 280px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
             animation: spinAndScale 1.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-            filter: drop-shadow(0px 0px 35px rgba(255, 215, 0, 0.85));
-            opacity: 0.85;
-            text-align: center;
+            filter: drop-shadow(0px 0px 35px rgba(255, 215, 0, 0.95));
         ">
-            🎲
+            <!-- Modelo SVG Vetorial de um D20 (Icosaedro) com facetas -->
+            <svg viewBox="0 0 100 100" style="width: 100%; height: 100%;">
+                <polygon points="50,5 90,25 50,38" fill="#7e22ce" stroke="#ffd700" stroke-width="1.8"/>
+                <polygon points="50,5 10,25 50,38" fill="#6b21a8" stroke="#ffd700" stroke-width="1.8"/>
+                <polygon points="50,5 90,25 10,25" fill="#9333ea" stroke="#ffd700" stroke-width="1.8" opacity="0.7"/>
+                <polygon points="10,25 50,38 10,75" fill="#581c87" stroke="#ffd700" stroke-width="1.8"/>
+                <polygon points="90,25 90,75 50,38" fill="#a855f7" stroke="#ffd700" stroke-width="1.8"/>
+                <polygon points="10,75 50,38 50,95" fill="#3b0764" stroke="#ffd700" stroke-width="1.8"/>
+                <polygon points="90,75 50,95 90,75" fill="#7e22ce" stroke="#ffd700" stroke-width="1.8"/>
+                <polygon points="10,75 50,95 90,75" fill="#4c1d95" stroke="#ffd700" stroke-width="1.8"/>
+            </svg>
+            
+            <!-- Número sorteado centralizado no D20 -->
             <div style="
-                font-size: 75px;
-                font-weight: bold;
+                position: absolute;
+                font-size: 80px;
+                font-weight: 900;
                 color: #FFFFFF;
-                font-family: sans-serif;
-                margin-top: -45px;
-                text-shadow: 3px 3px 12px #000;
+                font-family: 'Arial Black', sans-serif;
+                text-shadow: 2px 2px 8px #000, -2px -2px 8px #000, 0px 0px 18px #ffd700;
+                margin-top: 8px;
             ">
                 {val_final}
             </div>
@@ -102,11 +118,11 @@ def animar_rolagem_dado():
             opacity: 0.1;
         }}
         50% {{
-            transform: scale(1.6) rotate(720deg) translateY(0px);
+            transform: scale(1.5) rotate(720deg) translateY(0px);
             opacity: 0.95;
         }}
         85% {{
-            transform: scale(1.3) rotate(1080deg);
+            transform: scale(1.2) rotate(1080deg);
             opacity: 0.95;
         }}
         100% {{
