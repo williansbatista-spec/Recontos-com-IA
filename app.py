@@ -18,7 +18,7 @@ st.set_page_config(
     page_title="No Multiverso da Leitura", page_icon="🎲", layout="wide"
 )
 
-st.title("🎲 O Multiverso da Leitura")
+st.title("🎲 No Multiverso da Leitura")
 
 # ---------------------------------------------------------------------------
 # 2. ESTADO DA SESSÃO (SESSION STATE)
