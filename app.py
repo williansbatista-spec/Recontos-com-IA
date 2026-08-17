@@ -42,21 +42,86 @@ if "pergunta_atual" not in st.session_state:
     st.session_state.pergunta_atual = None
 
 # ---------------------------------------------------------------------------
-# 3. FUNÇÕES AUXILIARES, IA & ANIMAÇÕES
+# 3. FUNÇÕES AUXILIARES, IA, SOM & ANIMAÇÃO DE DADOS
 # ---------------------------------------------------------------------------
 def rolar_dado():
     return random.randint(1, 20)
 
 def animar_rolagem_dado():
-    """Animação visual da rolagem do D20 alterando os valores rapidamente."""
-    espaco_dado = st.empty()
-    for _ in range(12):
-        val_temp = random.randint(1, 20)
-        espaco_dado.markdown(f"### 🎲 Rolando D20... **[{val_temp}]**")
-        time.sleep(0.07)
-    
+    """Gera o resultado e exibe um dado gigante rodando por cima da tela inteira com efeito sonoro."""
     val_final = rolar_dado()
-    espaco_dado.markdown(f"### 🎯 Resultado Final do D20: **[{val_final}]**")
+    
+    # URL pública de áudio de rolagem de dados (Google Sound Library)
+    som_dado_url = "https://actions.google.com/sounds/v1/games/dice_roll.ogg"
+
+    # HTML/CSS e Audio injetados para animação em tela cheia com overlay
+    overlay_html = f"""
+    <audio autoplay style="display:none;">
+        <source src="{som_dado_url}" type="audio/ogg">
+    </audio>
+    <div id="dice-overlay" style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        background-color: rgba(0, 0, 0, 0.45);
+        z-index: 99999;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        pointer-events: none;
+        backdrop-filter: blur(4px);
+    ">
+        <div style="
+            font-size: 160px;
+            animation: spinAndScale 1.8s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            filter: drop-shadow(0px 0px 35px rgba(255, 215, 0, 0.85));
+            opacity: 0.85;
+            text-align: center;
+        ">
+            🎲
+            <div style="
+                font-size: 75px;
+                font-weight: bold;
+                color: #FFFFFF;
+                font-family: sans-serif;
+                margin-top: -45px;
+                text-shadow: 3px 3px 12px #000;
+            ">
+                {val_final}
+            </div>
+        </div>
+    </div>
+
+    <style>
+    @keyframes spinAndScale {{
+        0% {{
+            transform: scale(0.1) rotate(0deg) translateY(-300px);
+            opacity: 0.1;
+        }}
+        50% {{
+            transform: scale(1.6) rotate(720deg) translateY(0px);
+            opacity: 0.95;
+        }}
+        85% {{
+            transform: scale(1.3) rotate(1080deg);
+            opacity: 0.95;
+        }}
+        100% {{
+            transform: scale(1.0) rotate(1080deg);
+            opacity: 0;
+        }}
+    }}
+    </style>
+    """
+
+    placeholder = st.empty()
+    placeholder.markdown(overlay_html, unsafe_allow_html=True)
+    time.sleep(1.8)
+    placeholder.empty()
+
     return val_final
 
 def obter_primeiro_nome(nome_completo):
@@ -277,7 +342,6 @@ with st.sidebar:
 
     st.divider()
     
-    # Parâmetros de Seleção de Modelo
     modelo_together = st.selectbox(
         "🤖 Modelo da Narrativa:",
         [
@@ -295,7 +359,6 @@ with st.sidebar:
     )
     st.session_state["modelo_flux"] = modelo_flux
 
-    # Configuração Inicial antes da partida
     if not st.session_state.partida_iniciada:
         st.header("⚙️ Parâmetros do Jogo")
         st.session_state["total_rodadas"] = st.slider("Número de Rodadas:", min_value=5, max_value=35, value=20)
@@ -314,9 +377,7 @@ with st.sidebar:
             ]
         )
     else:
-        # =====================================================================
-        # PAINEL DE CONTROLE DO MESTRE (TUDO NA LATERAL)
-        # =====================================================================
+        # PAINEL DO MESTRE NA BARRA LATERAL
         st.divider()
         st.header("🕹️ Painel do Mestre")
 
@@ -327,7 +388,6 @@ with st.sidebar:
         is_chefe_rodada = (st.session_state.rodada_atual == tot_rodadas - 1)
         is_ultima_rodada = (st.session_state.rodada_atual >= tot_rodadas)
 
-        # Chamada rápida
         with st.expander("📋 Chamada / Presença", expanded=False):
             for idx, j in enumerate(st.session_state.jogadores):
                 is_p = st.checkbox(f"{j['aluno']} ({j['personagem']})", value=j.get("presente", True), key=f"pres_{idx}_{j['aluno']}")
@@ -337,7 +397,6 @@ with st.sidebar:
                         sortear_proximo_aluno_automatico()
                     st.rerun()
 
-        # Seleção de Herói do Turno
         if not is_chefe_rodada and not is_ultima_rodada:
             st.subheader("1. Seleção do Herói")
             if not st.session_state.aluno_sorteado and vivos:
@@ -353,7 +412,6 @@ with st.sidebar:
             if aluno_selecionado:
                 st.session_state.aluno_sorteado = aluno_selecionado
 
-                # Uso da Poção
                 if aluno_selecionado.get("tem_porcao_resgate") and congelados:
                     st.warning("🧪 Poção Disponível!")
                     aluno_salvar = st.selectbox(
@@ -452,7 +510,6 @@ with st.sidebar:
                         sortear_proximo_aluno_automatico(aluno_selecionado)
                         st.rerun()
 
-        # Decisão do Chefe Final
         elif is_chefe_rodada:
             st.subheader("🐉 Batalha do Chefe Final")
             trio_selecionado = st.multiselect(
@@ -477,7 +534,6 @@ with st.sidebar:
                         st.session_state.rodada_atual += 1
                         st.rerun()
 
-        # Encerramento do Jogo
         else:
             st.subheader("🏆 Encerrar Jogo")
             if st.button("🎬 Gerar Gran Finale!", type="primary", use_container_width=True):
@@ -622,7 +678,7 @@ else:
             st.write(ultimo["texto"])
 
     # -----------------------------------------------------------------------
-    # BOTÕES DE AÇÃO INTERATIVA (DADO + PERGUNTA DO LIVRO)
+    # BOTÕES DE AÇÃO INTERATIVA (DADO COM ANIMAÇÃO/SOM + PERGUNTA DO LIVRO)
     # -----------------------------------------------------------------------
     if not is_ultima_rodada:
         st.divider()
