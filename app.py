@@ -15,10 +15,10 @@ import streamlit as st
 # 1. CONFIGURAÇÃO DA PÁGINA
 # ---------------------------------------------------------------------------
 st.set_page_config(
-    page_title="RPG Escolar - Multiverso da Leitura", page_icon="🎲", layout="wide"
+    page_title="No Multiverso da Leitura", page_icon="🎲", layout="wide"
 )
 
-st.title("🎲 RPG Escolar: O Multiverso da Leitura")
+st.title("🎲 O Multiverso da Leitura")
 
 # ---------------------------------------------------------------------------
 # 2. ESTADO DA SESSÃO (SESSION STATE)
