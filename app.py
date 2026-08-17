@@ -764,6 +764,8 @@ else:
     tot_rodadas = st.session_state.get("total_rodadas", 20)
     is_chefe_rodada = (st.session_state.rodada_atual == tot_rodadas - 1)
     is_ultima_rodada = (st.session_state.rodada_atual >= tot_rodadas)
+    # --- BARRA DE PROGRESSO AQUI ---
+    st.progress(min(st.session_state.rodada_atual / tot_rodadas, 1.0))
 
     # 2. Exibição do Texto da Aventura e Imagem Gerada (MUITO IMPORTANTE: FICA NO TOPO DA TELA DA CENA)
     if st.session_state.historico:
