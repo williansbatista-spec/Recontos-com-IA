@@ -4,6 +4,7 @@ import random
 import time
 import base64
 import io
+import textwrap
 import requests
 import pandas as pd
 import streamlit as st
@@ -54,8 +55,8 @@ def animar_rolagem_dado():
     # Áudio público de rolar dados
     som_dado_url = "https://actions.google.com/sounds/v1/games/dice_roll.ogg"
 
-    # HTML/CSS + SVG do D20
-    overlay_html = f"""
+    # HTML/CSS + SVG do D20 com dedent para evitar bloco de código no Markdown
+    overlay_html = textwrap.dedent(f"""
     <audio autoplay style="display:none;">
         <source src="{som_dado_url}" type="audio/ogg">
     </audio>
@@ -65,14 +66,14 @@ def animar_rolagem_dado():
         left: 0;
         width: 100vw;
         height: 100vh;
-        background-color: rgba(0, 0, 0, 0.55);
+        background-color: rgba(0, 0, 0, 0.65);
         z-index: 99999;
         display: flex;
         flex-direction: column;
         justify-content: center;
         align-items: center;
         pointer-events: none;
-        backdrop-filter: blur(4px);
+        backdrop-filter: blur(5px);
     ">
         <div style="
             position: relative;
@@ -131,7 +132,7 @@ def animar_rolagem_dado():
         }}
     }}
     </style>
-    """
+    """)
 
     placeholder = st.empty()
     placeholder.markdown(overlay_html, unsafe_allow_html=True)
