@@ -888,10 +888,6 @@ else:
     if aluno and rodada_atual < tot_rodadas - 1:
         st.markdown(gerar_frase_convocacao(aluno))
 
-# 2. Executa a validação do turno
-    if aluno and rodada_atual < tot_rodadas - 1:
-    st.markdown(gerar_frase_convocacao(aluno))
-
     # Destaque para a Rodada e Progresso de Dificuldade (DC)
     col_info1, col_info2 = st.columns([2, 1])
     with col_info1:
@@ -899,14 +895,11 @@ else:
     with col_info2:
         st.metric(label="🎯 Dificuldade da Rodada (DC)", value=f"DC {dc_atual}")
 
+    # ==========================================
+    # VALIDAÇÃO RIGOROSA DE AÇÃO ÚNICA
+    # ==========================================
     if aluno and rodada_atual < tot_rodadas - 1:
         st.markdown(gerar_frase_convocacao(aluno))
-
-        # ==========================================
-# VALIDAÇÃO RIGOROSA DE AÇÃO ÚNICA
-# ==========================================
-if aluno and rodada_atual < tot_rodadas - 1:
-    st.markdown(gerar_frase_convocacao(aluno))
 
     if not st.session_state.desafio_atual:
         with st.spinner("⚠️ Um novo inimigo surge..."):
