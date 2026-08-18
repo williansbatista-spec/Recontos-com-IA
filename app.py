@@ -792,26 +792,26 @@ else:
 
         # 4. BOTÕES DE AÇÃO (FICAM ABAIXO DO TEXTO DA AVENTURA E DAS INFORMAÇÕES)
         col1, col2 = st.columns(2)
-        
-with col1:
-    if st.button("🎲 Rolar D20", use_container_width=True, type="primary"):
-        resultado = animar_rolagem_dado() 
-        st.session_state["ultimo_dado"] = resultado
-        st.rerun()
 
-    # --- CÁLCULO E AVISO DA META ABAIXO DO BOTÃO ---
-    tot_rodadas = st.session_state.get("total_rodadas", 20)
-    rodada_atual = st.session_state.get("rodada_atual", 1)
-    dc_minima = 10
-    dc_maxima = 18
+        with col1:
+            if st.button("🎲 Rolar D20", use_container_width=True, type="primary"):
+                resultado = animar_rolagem_dado()
+                st.session_state["ultimo_dado"] = resultado
+                st.rerun()
 
-    if tot_rodadas <= 1:
-        dificuldade_alvo = dc_minima
-    else:
-        progresso = (rodada_atual - 1) / (tot_rodadas - 1)
-        dificuldade_alvo = round(dc_minima + (progresso * (dc_maxima - dc_minima)))
+            # --- CÁLCULO E AVISO DA META ABAIXO DO BOTÃO ---
+            tot_rodadas = st.session_state.get("total_rodadas", 20)
+            rodada_atual = st.session_state.get("rodada_atual", 1)
+            dc_minima = 10
+            dc_maxima = 18
 
-    st.warning(f"🎯 **Meta:** Tirar **{dificuldade_alvo}** ou mais no dado!")
+            if tot_rodadas <= 1:
+                dificuldade_alvo = dc_minima
+            else:
+                progresso = (rodada_atual - 1) / (tot_rodadas - 1)
+                dificuldade_alvo = round(dc_minima + (progresso * (dc_maxima - dc_minima)))
+
+            st.warning(f"🎯 **Meta:** Tirar **{dificuldade_alvo}** ou mais no dado!")
 
         with col2:
             if st.button("❓ Gerar Pergunta do Livro", use_container_width=True):
