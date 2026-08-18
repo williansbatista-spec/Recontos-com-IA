@@ -826,7 +826,6 @@ else:
             progresso = (rodada_atual - 1) / (tot_rodadas - 1)
             dificuldade_alvo = round(dc_minima + (progresso * (dc_maxima - dc_minima)))
 
-        st.warning(f"🎯 **Meta:** Tirar **{dificuldade_alvo}** ou mais no dado!")
 
         with col2:
             if st.button("❓ Gerar Pergunta do Livro", use_container_width=True):
