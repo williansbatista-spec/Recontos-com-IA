@@ -942,13 +942,7 @@ else:
     acoes_lista = desafio.get("acoes", [])
     opcoes_texto = [a["texto"] for a in acoes_lista]
 
-        # Visualização de Status para o Mestre
-    if is_acao_correta:
-        st.success("🎯 **Estratégia Escolhida:** CORRETA (Explora o ponto fraco único!)")
-    else:
-        st.error("🚫 **Estratégia Escolhida:** INCORRETA (O inimigo é imune ou resistente a esta ação!)")
-
-    # --- RESOLUÇÃO DO TURNO PELO MESTRE ---
+            # --- RESOLUÇÃO DO TURNO PELO MESTRE ---
     st.subheader("3. Resolução da Jogada")
     is_acao_correta = st.session_state.get("acao_correta", False)
     acao_atual = st.session_state.get("acao_escolhida", None)
