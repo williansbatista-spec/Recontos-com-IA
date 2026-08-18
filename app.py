@@ -891,18 +891,140 @@ else:
     if aluno and rodada_atual < tot_rodadas - 1:
         st.markdown(gerar_frase_convocacao(aluno))
 
-        # --- GERAÇÃO DO DESAFIO COM AÇÃO ÚNICA VALIDA ---
-        if not st.session_state.desafio_atual:
-            with st.spinner("⚠️ Um novo inimigo surge com resistências e fraquezas..."):
-                st.session_state.desafio_atual = gerar_desafio_inimigo(
-                    together_key,
-                    st.session_state.mundo_mestre,
-                    st.session_state.jogadores,
-                    rodada_atual,
-                    tot_rodadas,
-                )
+        # ==========================================
+# VALIDAÇÃO RIGOROSA DE AÇÃO ÚNICA
+# ==========================================
+if aluno and rodada_atual < tot_rodadas - 1:
+    st.markdown(gerar_frase_convocacao(aluno))
 
-        desafio = st.session_state.desafio_atual
+    if not st.session_state.desafio_atual:
+        with st.spinner("⚠️ Um novo inimigo surge..."):
+            st.session_state.desafio_atual = gerar_desafio_inimigo(
+                together_key,
+                st.session_state.mundo_mestre,
+                st.session_state.jogadores,
+                rodada_atual,
+                tot_rodadas,
+            )
+
+    desafio = st.session_state.desafio_atual
+
+    # Exibição do Inimigo e Pista
+    st.error(f"👾 **Ameaça:** {desafio.get('inimigo', 'Inimigo')}\n\n📖 **Pista do Ponto Fraco:** {desafio.get('descricao', '')}")
+
+    st.markdown("#### 🎯 Escolha a Estratégia (Apenas 1 é a correta!):")
+    acoes_lista = desafio.get("acoes", [])
+    opcoes_texto = [a["texto"] for a in acoes_lista]
+
+    if opcoes_texto:
+        acao_selecionada = st.radio(
+            "Analise a pista acima com atenção antes de escolher:",
+            options=opcoes_texto,
+            key=f"radio_acao_{rodada_atual}",
+        )
+        
+        # Identifica o objeto exato da ação escolhida
+        acao_obj = next((a for a in acoes_lista if a["texto"] == acao_selecionada), None)
+        is_acao_correta = acao_obj.get("correta", False) if acao_obj else False
+        
+        st.session_state["acao_escolhida"] = acao_selecionada
+        st.session_state["acao_correta"] = is_acao_correta
+
+    st.divider()
+
+    # Visualização de Status para o Mestre
+    if is_acao_correta:
+        st.success("🎯 **Estratégia Escolhida:** CORRETA (Explora o ponto fraco único!)")
+    else:
+        st.error("🚫 **Estratégia Escolhida:** INCORRETA (O inimigo é imune ou resistente a esta ação!)")
+
+    # --- RESOLUÇÃO DO TURNO PELO MESTRE ---
+    st.subheader("3. Resolução da Jogada")
+
+    col_btn1, col_btn2 = st.columns(2)
+
+    with col_btn1:
+        # O botão de SUCESSO só fica ativo se a ação escolhida for a CORRETA
+        if st.button(
+            "🎉 Confirmar SUCESSO (+3 Moedas)",
+            type="primary",
+            disabled=not is_acao_correta, # DESABILITA SE A AÇÃO FOR INCORRETA
+            use_container_width=True,
+        ):
+            aluno["moedas"] = aluno.get("moedas", 0) + 3
+            if random.random() < 0.30:
+                aluno["tem_porcao_resgate"] = True
+                st.toast(f"✨ {obter_primeiro_nome(aluno['aluno'])} ganhou uma Poção!")
+
+            p_nome = obter_primeiro_nome(aluno["aluno"])
+            inimigo_info = desafio.get("inimigo", "Ameaça")
+
+            contexto = (
+                f"MUNDO BASE: '{st.session_state.mundo_mestre}'. RODADA: {st.session_state.rodada_atual}/{tot_rodadas}.\n"
+                f"INIMIGO: {inimigo_info}.\n"
+                f"AÇÃO: {acao_selecionada}.\n"
+                f"RESULTADO: SUCESSO TOTAL! {aluno['personagem']} ({p_nome}) decifrou a pista, atacou o ponto fraco exato e venceu o desafio!"
+            )
+
+            with st.spinner("Registrando vitória tática..."):
+                narrativa, p_img = gerar_narrativa_rpg(
+                    together_key, contexto, herois_vivos=vivos, heroi_ativo=aluno
+                )
+                img = gerar_imagem(p_img, together_key)
+
+                st.session_state.historico.append({
+                    "texto": narrativa,
+                    "img": img,
+                    "heroi": f"Vitória Tática de {aluno['personagem']}",
+                })
+                st.session_state.rodada_atual += 1
+                st.session_state.pergunta_atual = None
+                st.session_state.desafio_atual = None
+                st.session_state.pop("ultimo_dado", None)
+                sortear_proximo_aluno_automatico(aluno)
+                st.rerun()
+
+    with col_btn2:
+        # Se a ação for incorreta, o botão de falha ganha destaque
+        if st.button(
+            "💥 Registar FALHA (Estratégia Errada ou Dado Baixo)",
+            type="secondary" if is_acao_correta else "primary",
+            use_container_width=True,
+        ):
+            for j in st.session_state.jogadores:
+                if j["aluno"] == aluno["aluno"]:
+                    j["status"] = "CONGELADO"
+
+            p_nome = obter_primeiro_nome(aluno["aluno"])
+            inimigo_info = desafio.get("inimigo", "Ameaça")
+            motivo_falha = "escolheu a ação errada que bateu na resistência do inimigo" if not is_acao_correta else "falhou no teste do livro/dado"
+
+            contexto = (
+                f"MUNDO BASE: '{st.session_state.mundo_mestre}'. RODADA: {st.session_state.rodada_atual}/{tot_rodadas}.\n"
+                f"INIMIGO: {inimigo_info}.\n"
+                f"AÇÃO TENTADA: {acao_selecionada}.\n"
+                f"RESULTADO: FALHA! {aluno['personagem']} ({p_nome}) {motivo_falha} e foi congelado pela ameaça!"
+            )
+
+            vivos_restantes = [v for v in vivos if v["aluno"] != aluno["aluno"]]
+
+            with st.spinner("Registrando falha..."):
+                narrativa, p_img = gerar_narrativa_rpg(
+                    together_key, contexto, herois_vivos=vivos_restantes, heroi_ativo=aluno
+                )
+                img = gerar_imagem(p_img, together_key)
+
+                st.session_state.historico.append({
+                    "texto": narrativa,
+                    "img": img,
+                    "heroi": f"Falha de {aluno['personagem']}",
+                })
+                st.session_state.rodada_atual += 1
+                st.session_state.pergunta_atual = None
+                st.session_state.desafio_atual = None
+                st.session_state.pop("ultimo_dado", None)
+                sortear_proximo_aluno_automatico(aluno)
+                st.rerun()
 
         # Exibição do Card do Inimigo com Pista
         st.error(f"👾 **Ameaça:** {desafio.get('inimigo', 'Inimigo Misterioso')}\n\n📖 **Pista:** {desafio.get('descricao', '')}")
