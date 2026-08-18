@@ -876,10 +876,15 @@ if not st.session_state.partida_iniciada:
 else:
     renderizar_painel_jogadores()
 
+    # 1. Carrega o aluno e parâmetros da rodada (com indentação correta)
     aluno = st.session_state.get("aluno_sorteado")
-tot_rodadas = st.session_state.get("total_rodadas", 20)
-rodada_atual = st.session_state.get("rodada_atual", 1)
-dc_atual = calcular_dificuldade_rodada(rodada_atual, tot_rodadas)
+    tot_rodadas = st.session_state.get("total_rodadas", 20)
+    rodada_atual = st.session_state.get("rodada_atual", 1)
+    dc_atual = calcular_dificuldade_rodada(rodada_atual, tot_rodadas)
+
+    # 2. Executa a validação do turno
+    if aluno and rodada_atual < tot_rodadas - 1:
+        st.markdown(gerar_frase_convocacao(aluno))
 
 # 2. Executa a validação do turno
 if aluno and rodada_atual < tot_rodadas - 1:
