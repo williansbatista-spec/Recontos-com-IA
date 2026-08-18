@@ -887,7 +887,6 @@ else:
     # 2. Executa a validação do turno
     if aluno and rodada_atual < tot_rodadas - 1:
         st.markdown(gerar_frase_convocacao(aluno))
-
     # Destaque para a Rodada e Progresso de Dificuldade (DC)
     col_info1, col_info2 = st.columns([2, 1])
     with col_info1:
