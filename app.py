@@ -209,6 +209,7 @@ def gerar_narrativa_rpg(
     1. Jamais use termos de morte ou violência real. Alunos derrotados são apenas 'congelados', 'capturados' ou 'expulsos da área'.
     2. NUNCA descongele ou salve um jogador congelado por conta própria na narrativa. O resgate ocorre exclusivamente quando outro jogador decide usar sua poção.
     3. Quando o herói vence o desafio da rodada, TODA A COMITIVA de heróis avança junto para o próximo estágio/ambiente do mundo base: '{st.session_state.get('mundo_mestre', '')}'.
+    4. Adapte explicitamente a narrativa e as consequências para a AÇÃO TÁTICA escolhida pelo jogador (ex: ataque direto, atalho, distração, etc).
     
     FORMATO DE RESPOSTA (ESTRITO):
     Responda ESTRITAMENTE em duas partes separadas por '---':
@@ -489,6 +490,10 @@ with st.sidebar:
 
             st.subheader("2. Decisão do Mestre")
             if aluno_selecionado:
+                acao_escolhida = st.session_state.get(
+                    "acao_escolhida", "Ataque Frontal"
+                )
+
                 if st.button(
                     "✅ SUCESSO (+3 Moedas)",
                     type="primary",
@@ -513,8 +518,9 @@ with st.sidebar:
                     contexto = (
                         f"MUNDO BASE: '{st.session_state.mundo_mestre}'. RODADA: {st.session_state.rodada_atual}/{tot_rodadas}. "
                         f"CENA ANTERIOR: {cena_anterior}\n"
-                        f"AÇÃO: {aluno_selecionado['personagem']} ({p_nome}) usou '{aluno_selecionado['item']}' e VENCEU! "
-                        f"INSTRUÇÃO: Narre o sucesso e faça toda a comitiva avançar junta para o próximo desafio."
+                        f"AÇÃO TÁTICA ESCOLHIDA: {acao_escolhida}.\n"
+                        f"DESEMPENHO: {aluno_selecionado['personagem']} ({p_nome}) usou '{aluno_selecionado['item']}' com a estratégia de '{acao_escolhida}' e VENCEU! "
+                        f"INSTRUÇÃO: Narre o sucesso enfatizando como a estratégia de '{acao_escolhida}' funcionou perfeitamente e faça toda a comitiva avançar junta para o próximo desafio."
                     )
 
                     with st.spinner("Gerando sucesso..."):
@@ -527,12 +533,12 @@ with st.sidebar:
                         img = gerar_imagem(p_img, together_key)
 
                         st.session_state.roteiro_hq.append(
-                            f"RODADA {st.session_state.rodada_atual}: [SUCESSO] {aluno_selecionado['personagem']}."
+                            f"RODADA {st.session_state.rodada_atual}: [SUCESSO - {acao_escolhida}] {aluno_selecionado['personagem']}."
                         )
                         st.session_state.historico.append({
                             "texto": narrativa,
                             "img": img,
-                            "heroi": f"Sucesso de {aluno_selecionado['personagem']}",
+                            "heroi": f"Sucesso de {aluno_selecionado['personagem']} ({acao_escolhida})",
                         })
                         st.session_state.rodada_atual += 1
                         st.session_state.pergunta_atual = None
@@ -549,8 +555,9 @@ with st.sidebar:
 
                     contexto = (
                         f"MUNDO BASE: '{st.session_state.mundo_mestre}'. RODADA: {st.session_state.rodada_atual}/{tot_rodadas}. "
-                        f"AÇÃO: {aluno_selecionado['personagem']} ({p_nome}) FALHOU e foi congelado temporariamente. "
-                        f"INSTRUÇÃO: Narre o congelamento sem descongelar o herói."
+                        f"AÇÃO TÁTICA TENTADA: {acao_escolhida}.\n"
+                        f"DESEMPENHO: {aluno_selecionado['personagem']} ({p_nome}) tentou '{acao_escolhida}', mas FALHOU e foi congelado temporariamente. "
+                        f"INSTRUÇÃO: Narre como a tentativa de '{acao_escolhida}' falhou e causou o congelamento, sem descongelar o herói."
                     )
 
                     vivos_restantes = [
@@ -569,7 +576,7 @@ with st.sidebar:
                         img = gerar_imagem(p_img, together_key)
 
                         st.session_state.roteiro_hq.append(
-                            f"RODADA {st.session_state.rodada_atual}: [FALHA] {aluno_selecionado['personagem']}."
+                            f"RODADA {st.session_state.rodada_atual}: [FALHA - {acao_escolhida}] {aluno_selecionado['personagem']}."
                         )
                         st.session_state.historico.append({
                             "texto": narrativa,
@@ -657,6 +664,7 @@ with st.sidebar:
                 "aluno_sorteado",
                 "pergunta_atual",
                 "ultimo_dado",
+                "acao_escolhida",
             ]:
                 st.session_state.pop(key, None)
             st.rerun()
@@ -738,7 +746,9 @@ if not st.session_state.partida_iniciada:
                         })
 
                     st.session_state.jogadores = jogadores
-                    st.session_state.mundo_mestre = jogadores[0]["livro"] if jogadores else "Mundo Mágico"
+                    st.session_state.mundo_mestre = (
+                        jogadores[0]["livro"] if jogadores else "Mundo Mágico"
+                    )
                     sortear_proximo_aluno_automatico()
 
                     with st.spinner("Gerando introdução épica do mundo..."):
@@ -784,6 +794,26 @@ else:
     if aluno and rodada_atual < tot_rodadas - 1:
         st.markdown(gerar_frase_convocacao(aluno))
 
+        # --- SELEÇÃO DA AÇÃO TÁTICA ---
+        st.markdown("#### 🎯 Qual estratégia o herói vai usar?")
+        opcoes_acoes = [
+            "⚔️ Ataque Frontal (Enfrentar o desafio diretamente)",
+            "🎨 Distração / Furtividade (Usar esperteza para passar despercebido)",
+            "🔍 Investigar Fraqueza (Analisar o inimigo/obstáculo antes)",
+            "🗺️ Procurar Atalho (Usar o ambiente para cortar caminho)",
+            "💡 Outra ação criativa (Mestre/Aluno define)",
+        ]
+
+        acao_selecionada = st.radio(
+            "Escolha a ação do aluno:",
+            options=opcoes_acoes,
+            key="radio_acao_tatica",
+        )
+        st.session_state["acao_escolhida"] = acao_selecionada.split(" (")[0]
+
+        st.divider()
+
+        # --- DADO & PERGUNTA ---
         c1, c2 = st.columns(2)
         with c1:
             if st.button("🎲 Rolar D20 com Animação", use_container_width=True):
@@ -797,9 +827,13 @@ else:
                 elif dado_val == 1:
                     st.error(f"🎲 Resultado: **{dado_val}** — 💀 FALHA CRÍTICA!")
                 elif dado_val >= dc_atual:
-                    st.success(f"🎲 Resultado: **{dado_val}** (Superou a DC {dc_atual}! ✅)")
+                    st.success(
+                        f"🎲 Resultado: **{dado_val}** (Superou a DC {dc_atual}! ✅)"
+                    )
                 else:
-                    st.error(f"🎲 Resultado: **{dado_val}** (Abaixo da DC {dc_atual}... ❌)")
+                    st.error(
+                        f"🎲 Resultado: **{dado_val}** (Abaixo da DC {dc_atual}... ❌)"
+                    )
 
         with c2:
             if st.button("📖 Gerar Pergunta do Livro", use_container_width=True):
@@ -807,12 +841,16 @@ else:
                     pergunta = gerar_pergunta_livro(
                         together_key,
                         aluno["livro"],
-                        st.session_state.get("faixa_etaria", "Ensino Fundamental I"),
+                        st.session_state.get(
+                            "faixa_etaria", "Ensino Fundamental I"
+                        ),
                     )
                     st.session_state.pergunta_atual = pergunta
 
         if st.session_state.pergunta_atual:
-            st.warning(f"**Pergunta sobre '{aluno['livro']}':**\n\n{st.session_state.pergunta_atual}")
+            st.warning(
+                f"**Pergunta sobre '{aluno['livro']}':**\n\n{st.session_state.pergunta_atual}"
+            )
 
     st.divider()
     st.markdown("### 📜 Diário da Jornada")
