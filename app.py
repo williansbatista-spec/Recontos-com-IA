@@ -13,10 +13,19 @@ import streamlit as st
 
 
 # ==========================================
-# 1. FUNÇÕES AUXILIARES E CONVOCAÇÃO
+# 1. FUNÇÕES AUXILIARES, DIFICULDADE E CONVOCAÇÃO
 # ==========================================
 def obter_primeiro_nome(nome_completo):
     return str(nome_completo).strip().split()[0] if nome_completo else "Herói"
+
+
+def calcular_dificuldade_rodada(rodada_atual, total_rodadas):
+    """Calcula a DC (Classe de Dificuldade) progressiva de 8 a 18 com base na rodada."""
+    if total_rodadas <= 1:
+        return 10
+    progresso = (rodada_atual - 1) / max(1, total_rodadas - 1)
+    dc = int(8 + (progresso * 10))
+    return min(dc, 18)
 
 
 def gerar_frase_convocacao(aluno):
@@ -28,10 +37,6 @@ def gerar_frase_convocacao(aluno):
     personagem = aluno.get("personagem", "Aventureiro")
 
     return f"📜 **O grande Mestre dos Jogos convoca o(a) {titulo} {personagem} ({p_nome}) para enfrentar este grande desafio!**"
-
-
-def animar_roleta_heroi(jogadores_vivos):
-    pass
 
 
 # ---------------------------------------------------------------------------
@@ -117,7 +122,7 @@ def renderizar_painel_jogadores():
         st.info("Nenhum aluno cadastrado/presente.")
         return
 
-    cols_por_linha = math.ceil(total / 2)
+    cols_por_linha = math.ceil(total / 2) if total > 1 else 1
 
     cols_l1 = st.columns(cols_por_linha)
     for idx in range(cols_por_linha):
@@ -766,10 +771,17 @@ else:
 
     aluno = st.session_state.aluno_sorteado
     tot_rodadas = st.session_state.get("total_rodadas", 20)
+    rodada_atual = st.session_state.rodada_atual
+    dc_atual = calcular_dificuldade_rodada(rodada_atual, tot_rodadas)
 
-    st.subheader(f"📍 Rodada {st.session_state.rodada_atual} de {tot_rodadas}")
+    # Destaque para a Rodada e Progresso de Dificuldade (DC)
+    col_info1, col_info2 = st.columns([2, 1])
+    with col_info1:
+        st.subheader(f"📍 Rodada {rodada_atual} de {tot_rodadas}")
+    with col_info2:
+        st.metric(label="🎯 Dificuldade da Rodada (DC)", value=f"DC {dc_atual}")
 
-    if aluno and st.session_state.rodada_atual < tot_rodadas - 1:
+    if aluno and rodada_atual < tot_rodadas - 1:
         st.markdown(gerar_frase_convocacao(aluno))
 
         c1, c2 = st.columns(2)
@@ -779,7 +791,15 @@ else:
                 st.session_state["ultimo_dado"] = val
 
             if "ultimo_dado" in st.session_state:
-                st.info(f"Resultado do Dado: **{st.session_state['ultimo_dado']}**")
+                dado_val = st.session_state["ultimo_dado"]
+                if dado_val == 20:
+                    st.success(f"🎲 Resultado: **{dado_val}** — 🔥 SUCESSO CRÍTICO!")
+                elif dado_val == 1:
+                    st.error(f"🎲 Resultado: **{dado_val}** — 💀 FALHA CRÍTICA!")
+                elif dado_val >= dc_atual:
+                    st.success(f"🎲 Resultado: **{dado_val}** (Superou a DC {dc_atual}! ✅)")
+                else:
+                    st.error(f"🎲 Resultado: **{dado_val}** (Abaixo da DC {dc_atual}... ❌)")
 
         with c2:
             if st.button("📖 Gerar Pergunta do Livro", use_container_width=True):
