@@ -380,29 +380,52 @@ def gerar_imagem(prompt_text, together_key):
         return None
 
 
-def gerar_pergunta_livro(together_key, livro, faixa_etaria):
+def gerar_pergunta_livro_com_gabarito(together_key, livro, faixa_etaria):
+    """Gera pergunta simples com 3 opções e indica qual é o índice correto (0 a 2)."""
     if not together_key:
-        return "⚠️ Chave de API TOGETHER_API_KEY necessária para gerar perguntas."
+        # Retorno de segurança caso a API falhe ou não tenha chave
+        return {
+            "pergunta": "Onde se passa a maior parte desta história?",
+            "opcoes": ["Na floresta", "No espaço sideral", "Na cidade mágica"],
+            "resposta_correta": 0 
+        }
+
+    client = obter_cliente_together(together_key)
+    modelo = st.session_state.get("modelo_together", "meta-llama/Llama-3.3-70B-Instruct-Turbo")
+
+    prompt_sistema = f"""
+    Você é um professor criando um quiz rápido sobre o livro '{livro}' para {faixa_etaria}.
+    Gere 1 pergunta MUITO SIMPLES e DIRETA sobre a história (ex: Onde se passa a história? O que o personagem principal fez? Quem é o vilão?).
+    Crie exatamente 3 alternativas curtas.
+    
+    FORMATO JSON ESTRITO (Responda APENAS o JSON, sem nenhum texto antes ou depois):
+    {{
+      "pergunta": "Texto da pergunta",
+      "opcoes": ["Opção A", "Opção B", "Opção C"],
+      "resposta_correta": 0
+    }}
+    O campo 'resposta_correta' é o índice inteiro da resposta certa (0 para a primeira, 1 para a segunda, 2 para a terceira).
+    """
+
     try:
-        client = obter_cliente_together(together_key)
-        modelo = st.session_state.get(
-            "modelo_together", "meta-llama/Llama-3.3-70B-Instruct-Turbo"
-        )
-        prompt = (
-            f"Gere uma pergunta desafiadora e pedagógica sobre o livro '{livro}', "
-            f"adequada para alunos da faixa etária: {faixa_etaria}. A pergunta deve testar a "
-            f"compreensão de leitura do aluno de forma divertida e adequada para um RPG."
-        )
         response = client.chat.completions.create(
             model=modelo,
-            messages=[{"role": "user", "content": prompt}],
-            max_tokens=300,
-            temperature=0.7,
+            messages=[{"role": "system", "content": prompt_sistema}],
+            max_tokens=400,
+            temperature=0.4, # Temperatura mais baixa para evitar invenções complexas
         )
-        return response.choices[0].message.content.strip()
+        match = re.search(r"\{.*\}", response.choices[0].message.content, re.DOTALL)
+        if match:
+            return json.loads(match.group(0))
     except Exception as e:
-        return f"Erro ao gerar pergunta: {e}"
+        st.warning(f"Erro ao gerar pergunta com gabarito: {e}")
 
+    # Retorno padrão caso a IA não retorne um JSON válido
+    return {
+        "pergunta": f"Sobre o livro '{livro}', o que acontece no final?",
+        "opcoes": ["Os heróis perdem", "Os heróis vencem", "Ninguém sabe"],
+        "resposta_correta": 1
+    }
 
 # ---------------------------------------------------------------------------
 # 4. BARRA LATERAL: CONFIGURAÇÕES & PAINEL DO MESTRE
