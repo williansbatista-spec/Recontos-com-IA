@@ -919,23 +919,7 @@ else:
     acoes_lista = desafio.get("acoes", [])
     opcoes_texto = [a["texto"] for a in acoes_lista]
 
-    if opcoes_texto:
-        acao_selecionada = st.radio(
-            "Analise a pista acima com atenção antes de escolher:",
-            options=opcoes_texto,
-            key=f"radio_acao_{rodada_atual}",
-        )
-        
-        # Identifica o objeto exato da ação escolhida
-        acao_obj = next((a for a in acoes_lista if a["texto"] == acao_selecionada), None)
-        is_acao_correta = acao_obj.get("correta", False) if acao_obj else False
-        
-        st.session_state["acao_escolhida"] = acao_selecionada
-        st.session_state["acao_correta"] = is_acao_correta
-
-    st.divider()
-
-    # Visualização de Status para o Mestre
+        # Visualização de Status para o Mestre
     if is_acao_correta:
         st.success("🎯 **Estratégia Escolhida:** CORRETA (Explora o ponto fraco único!)")
     else:
@@ -1037,60 +1021,65 @@ else:
         st.markdown("#### 🎯 Escolha a Estratégia Tática:")
         acoes_lista = desafio.get("acoes", [])
         opcoes_texto = [a["texto"] for a in acoes_lista]
+# 2. SELEÇÃO DA ESTRATÉGIA
+    st.markdown("#### 🎯 Passo 1: Escolha sua Estratégia Tática")
+    acoes_lista = desafio.get("acoes", [])
+    opcoes_texto = [a["texto"] for a in acoes_lista]
 
-        if opcoes_texto:
-            acao_selecionada = st.radio(
-                "Leia a pista com atenção e escolha a única ação capaz de superar este desafio:",
-                options=opcoes_texto,
-                key=f"radio_acao_{rodada_atual}",
-            )
-            
-            # Validação interna da ação
-            acao_obj = next((a for a in acoes_lista if a["texto"] == acao_selecionada), None)
-            st.session_state["acao_escolhida"] = acao_selecionada
-            st.session_state["acao_correta"] = acao_obj.get("correta", False) if acao_obj else False
+    if opcoes_texto:
+        acao_selecionada = st.radio(
+            "Leia a pista com atenção e escolha a única ação capaz de superar este desafio:",
+            options=opcoes_texto,
+            key=f"radio_acao_{rodada_atual}_{aluno['aluno']}", # <-- Chave 100% segura agora
+        )
+        
+        # Validação interna da ação (Silenciosa, o resultado só sai no botão de Avançar)
+        acao_obj = next((a for a in acoes_lista if a["texto"] == acao_selecionada), None)
+        is_estrategia_correta = acao_obj.get("correta", False) if acao_obj else False
+        
+        st.session_state["acao_escolhida"] = acao_selecionada
+        st.session_state["acao_correta"] = is_estrategia_correta
 
-        st.divider()
+    st.divider()
+        
+    # --- DADO & PERGUNTA (HABILITAÇÃO) ---
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("🎲 Rolar D20 com Animação", use_container_width=True):
+            val = animar_rolagem_dado()
+            st.session_state["ultimo_dado"] = val
 
-        # --- DADO & PERGUNTA (HABILITAÇÃO) ---
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("🎲 Rolar D20 com Animação", use_container_width=True):
-                val = animar_rolagem_dado()
-                st.session_state["ultimo_dado"] = val
+        if "ultimo_dado" in st.session_state:
+            dado_val = st.session_state["ultimo_dado"]
+            if dado_val == 20:
+                st.success(f"🎲 Resultado: **{dado_val}** — 🔥 SUCESSO CRÍTICO!")
+            elif dado_val == 1:
+                st.error(f"🎲 Resultado: **{dado_val}** — 💀 FALHA CRÍTICA!")
+            elif dado_val >= dc_atual:
+                st.success(
+                    f"🎲 Resultado: **{dado_val}** (Superou a DC {dc_atual}! ✅)"
+                )
+            else:
+                st.error(
+                    f"🎲 Resultado: **{dado_val}** (Abaixo da DC {dc_atual}... ❌)"
+                )
 
-            if "ultimo_dado" in st.session_state:
-                dado_val = st.session_state["ultimo_dado"]
-                if dado_val == 20:
-                    st.success(f"🎲 Resultado: **{dado_val}** — 🔥 SUCESSO CRÍTICO!")
-                elif dado_val == 1:
-                    st.error(f"🎲 Resultado: **{dado_val}** — 💀 FALHA CRÍTICA!")
-                elif dado_val >= dc_atual:
-                    st.success(
-                        f"🎲 Resultado: **{dado_val}** (Superou a DC {dc_atual}! ✅)"
-                    )
-                else:
-                    st.error(
-                        f"🎲 Resultado: **{dado_val}** (Abaixo da DC {dc_atual}... ❌)"
-                    )
+    with c2:
+        if st.button("📖 Gerar Pergunta do Livro", use_container_width=True):
+            with st.spinner("Buscando pergunta pedagógica..."):
+                pergunta = gerar_pergunta_livro(
+                    together_key,
+                    aluno.get("livro", ""),
+                    st.session_state.get(
+                        "faixa_etaria", "Ensino Fundamental I"
+                    ),
+                )
+                st.session_state.pergunta_atual = pergunta
 
-        with c2:
-            if st.button("📖 Gerar Pergunta do Livro", use_container_width=True):
-                with st.spinner("Buscando pergunta pedagógica..."):
-                    pergunta = gerar_pergunta_livro(
-                        together_key,
-                        aluno.get("livro", ""),
-                        st.session_state.get(
-                            "faixa_etaria", "Ensino Fundamental I"
-                        ),
-                    )
-                    st.session_state.pergunta_atual = pergunta
-                    st.session_state.pergunta_atual = pergunta
-
-        if st.session_state.pergunta_atual:
-            st.warning(
-                f"**Pergunta sobre '{aluno['livro']}':**\n\n{st.session_state.pergunta_atual}"
-            )
+    if st.session_state.pergunta_atual:
+        st.warning(
+            f"**Pergunta sobre '{aluno['livro']}':**\n\n{st.session_state.pergunta_atual}"
+        )
 
     st.divider()
     st.markdown("### 📜 Diário da Jornada")
