@@ -203,6 +203,9 @@ def gerar_narrativa_rpg(
         prompt_contexto = (
             f"INTRODUÇÃO DA AVENTURA: Apresente o reino fantástico do livro '{st.session_state.mundo_mestre}'. "
             f"Descreva como a comitiva de heróis chegou a este lugar e apresente o primeiro grande desafio no horizonte!"
+            f"MUNDO BASE: '{st.session_state.mundo_mestre}'. RODADA: {st.session_state.rodada_atual}.\n"
+    f"DESAFIO: O herói {aluno_selecionado['personagem']} precisa agir.\n"
+    f"IMPORTANTE: Termine a narrativa exatamente com a frase: '{convocacao}'"
         )
     elif is_final:
         prompt_contexto += " ESTA É A CENA FINAL! Narre a grande celebração vitoriosa e épica da turma após cumprirem a jornada."
