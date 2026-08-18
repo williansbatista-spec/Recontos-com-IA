@@ -1090,39 +1090,30 @@ else:
     with c2:
         if st.button("📖 Gerar Pergunta do Livro", use_container_width=True):
             with st.spinner("Buscando pergunta pedagógica..."):
-                # 1. Chama a NOVA função que criamos
                 st.session_state.pergunta_atual = gerar_pergunta_livro_com_gabarito(
                     together_key,
                     aluno.get("livro", ""),
-                    st.session_state.get(
-                        "faixa_etaria", "Ensino Fundamental I"
-                    ),
+                    st.session_state.get("faixa_etaria", "Ensino Fundamental I"),
                 )
 
-    # 2. Exibe a pergunta e as 3 alternativas!
-    if st.session_state.pergunta_atual:
-        p_obj = st.session_state.pergunta_atual
-        st.warning(f"**Pergunta sobre '{aluno['livro']}':**\n\n{p_obj['pergunta']}")
-        
-        resposta_aluno_idx = st.radio(
-            "Escolha a alternativa correta:",
-            options=range(len(p_obj["opcoes"])),
-            format_func=lambda i: p_obj["opcoes"][i],
-            key=f"resp_livro_{rodada_atual}_{aluno['aluno']}"
-        )
-        
-        # 3. Validação imediata para o Mestre ver
-        if resposta_aluno_idx == p_obj["resposta_correta"]:
-            st.success("✨ Resposta do livro CORRETA! ✅")
-            st.session_state["passou_habilitacao"] = True
-        else:
-            st.error("❌ Resposta do livro INCORRETA...")
-            st.session_state["passou_habilitacao"] = False
-
-    if st.session_state.pergunta_atual:
-        st.warning(
-            f"**Pergunta sobre '{aluno['livro']}':**\n\n{st.session_state.pergunta_atual}"
-        )
+        # Exibe a pergunta e as opções limpas
+        if st.session_state.pergunta_atual:
+            p_obj = st.session_state.pergunta_atual
+            
+            st.warning(f"**Pergunta sobre '{aluno['livro']}':**\n\n{p_obj['pergunta']}")
+            
+            resposta_aluno_idx = st.radio(
+                "Escolha a alternativa correta:",
+                options=range(len(p_obj["opcoes"])),
+                format_func=lambda i: p_obj["opcoes"][i],
+                key=f"resp_livro_{rodada_atual}_{aluno['aluno']}"
+            )
+            
+            # Validação SILENCIOSA para o Mestre
+            st.session_state["passou_habilitacao"] = (resposta_aluno_idx == p_obj["resposta_correta"])
+            
+    # IMPORTANTE: Se houver qualquer outro 'if st.session_state.pergunta_atual:' 
+    # solto aqui embaixo no seu arquivo original, APAGUE-O!
 
     st.divider()
     st.markdown("### 📜 Diário da Jornada")
