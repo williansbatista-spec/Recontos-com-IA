@@ -11,6 +11,27 @@ from PIL import Image
 import requests
 import streamlit as st
 
+# ==========================================
+# 2. FUNÇÕES AUXILIARES E CONVOCAÇÃO
+# (Definidas no topo, mas só rolam quando chamadas)
+# ==========================================
+def obter_primeiro_nome(nome_completo):
+    return str(nome_completo).split()[0] if nome_completo else "Herói"
+
+def gerar_frase_convocacao(aluno):
+    if not aluno:
+        return ""
+    titulos = ["guerreiro(a)", "paladino(a)", "aventureiro(a)", "mago(a) supremo(a)"]
+    titulo = random.choice(titulos)
+    p_nome = obter_primeiro_nome(aluno.get("aluno", "Herói"))
+    personagem = aluno.get("personagem", "Aventureiro")
+    
+    return f"📜 **O grande Mestre dos Jogos convoca o(a) {titulo} {personagem} ({p_nome}) para enfrentar este grande desafio!**"
+
+def animar_roleta_heroi(jogadores_vivos):
+    # (Código da roleta animada entra aqui)
+    pass
+
 # ---------------------------------------------------------------------------
 # 1. CONFIGURAÇÃO DA PÁGINA
 # ---------------------------------------------------------------------------
@@ -204,7 +225,7 @@ def gerar_narrativa_rpg(
             f"INTRODUÇÃO DA AVENTURA: Apresente o reino fantástico do livro '{st.session_state.mundo_mestre}'. "
             f"Descreva como a comitiva de heróis chegou a este lugar e apresente o primeiro grande desafio no horizonte!"
             f"MUNDO BASE: '{st.session_state.mundo_mestre}'. RODADA: {st.session_state.rodada_atual}.\n"
-    f"DESAFIO: O herói {aluno_atual['personagem']} precisa agir.\n"
+    f"DESAFIO: O herói {aluno_selecionado['personagem']} precisa agir.\n"
     f"IMPORTANTE: Termine a narrativa exatamente com a frase: '{convocacao}'"
         )
     elif is_final:
@@ -644,6 +665,14 @@ with st.sidebar:
 # ---------------------------------------------------------------------------
 # 5. TELA DE CARREGAMENTO (IMPORTAÇÃO DO CSV)
 # ---------------------------------------------------------------------------
+if "rodada_atual" not in st.session_state:
+    st.session_state.rodada_atual = 1
+if "total_rodadas" not in st.session_state:
+    st.session_state.total_rodadas = 20
+if "jogadores" not in st.session_state:
+    st.session_state.jogadores = []
+if "aluno_sorteado" not in st.session_state:
+    st.session_state.aluno_sorteado = None
 if not st.session_state.partida_iniciada:
     st.header("📂 1. Carregar Ficha da Turma (CSV)")
     st.markdown(
