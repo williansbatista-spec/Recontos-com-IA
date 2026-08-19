@@ -1022,148 +1022,12 @@ else:
 
     desafio = st.session_state.desafio_atual
 
-    # Exibição do Inimigo e Pista
-    st.error(f"👾 **Ameaça:** {desafio.get('inimigo', 'Inimigo')}\n\n📖 **Pista do Ponto Fraco:** {desafio.get('descricao', '')}")
+    st.error(
+        f"👾 **Ameaça:** {desafio.get('inimigo', 'Inimigo')}\n\n"
+        f"📖 **Pista do Ponto Fraco:** {desafio.get('descricao', '')}"
+    )
 
     st.markdown("#### 🎯 Escolha a Estratégia (Apenas 1 é a correta!):")
-    acoes_lista = desafio.get("acoes", [])
-    opcoes_texto = [a["texto"] for a in acoes_lista]
-
-            # --- RESOLUÇÃO DO TURNO PELO MESTRE ---
-   # ==========================================
-    # GERAÇÃO DO DESAFIO
-    # ==========================================
-    if aluno and rodada_atual < tot_rodadas - 1:
-        st.markdown(gerar_frase_convocacao(aluno))
-
-        if not st.session_state.desafio_atual:
-            with st.spinner("⚠️ Um novo inimigo surge..."):
-                st.session_state.desafio_atual = gerar_desafio_inimigo(
-                    together_key,
-                    st.session_state.mundo_mestre,
-                    st.session_state.jogadores,
-                    rodada_atual,
-                    tot_rodadas,
-                )
-
-        desafio = st.session_state.desafio_atual
-
-        # ÚNICA Exibição do Inimigo e Pista
-        st.error(f"👾 **Ameaça:** {desafio.get('inimigo', 'Inimigo')}\n\n📖 **Pista:** {desafio.get('descricao', '')}")
-
-        # ==========================================
-        # PASSO 1: SELEÇÃO DA ESTRATÉGIA
-        # ==========================================
-        st.markdown("#### 🎯 Passo 1: Escolha sua Estratégia Tática")
-        acoes_lista = desafio.get("acoes", [])
-        opcoes_texto = [a["texto"] for a in acoes_lista]
-
-        if opcoes_texto:
-            acao_selecionada = st.radio(
-                "Leia a pista com atenção e escolha a única ação capaz de superar este desafio:",
-                options=opcoes_texto,
-                key=f"radio_acao_{rodada_atual}_{aluno['aluno']}",
-            )
-            
-            # Validação interna e silenciosa
-            acao_obj = next((a for a in acoes_lista if a["texto"] == acao_selecionada), None)
-            is_estrategia_correta = acao_obj.get("correta", False) if acao_obj else False
-            
-            st.session_state["acao_escolhida"] = acao_selecionada
-            st.session_state["acao_correta"] = is_estrategia_correta
-
-        st.divider()
-        
-        # ==========================================
-        # PASSO 2: DADO E LIVRO
-        # ==========================================
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("🎲 Rolar D20 com Animação", use_container_width=True):
-                # ... (resto do seu código do dado) ...
-            aluno["moedas"] = aluno.get("moedas", 0) + 3
-            if random.random() < 0.30:
-                aluno["tem_porcao_resgate"] = True
-                st.toast(f"✨ {obter_primeiro_nome(aluno['aluno'])} ganhou uma Poção!")
-
-            p_nome = obter_primeiro_nome(aluno["aluno"])
-            inimigo_info = desafio.get("inimigo", "Ameaça")
-
-            contexto = (
-                f"MUNDO BASE: '{st.session_state.mundo_mestre}'. RODADA: {rodada_atual}/{tot_rodadas}.\n"
-                f"INIMIGO: {inimigo_info}.\n"
-                f"AÇÃO: {acao_atual}.\n"
-                f"RESULTADO: SUCESSO TOTAL! {aluno['personagem']} ({p_nome}) decifrou a pista, atacou o ponto fraco exato e venceu o desafio!"
-            )
-
-            with st.spinner("Registrando vitória tática..."):
-                narrativa, p_img = gerar_narrativa_rpg(
-                    together_key, contexto, herois_vivos=vivos, heroi_ativo=aluno
-                )
-                img = gerar_imagem(p_img, together_key)
-
-                st.session_state.historico.append({
-                    "texto": narrativa,
-                    "img": img,
-                    "heroi": f"Vitória Tática de {aluno['personagem']}",
-                })
-                st.session_state.rodada_atual += 1
-                st.session_state.pergunta_atual = None
-                st.session_state.desafio_atual = None
-                st.session_state.pop("ultimo_dado", None)
-                sortear_proximo_aluno_automatico(aluno)
-                st.rerun()
-
-    with col_btn2:
-        # Se a ação for incorreta, o botão de falha ganha destaque
-        if st.button(
-            "💥 Registar FALHA (Estratégia Errada ou Dado Baixo)",
-            type="secondary" if is_acao_correta else "primary",
-            use_container_width=True,
-        ):
-            for j in st.session_state.jogadores:
-                if j["aluno"] == aluno["aluno"]:
-                    j["status"] = "CONGELADO"
-
-            p_nome = obter_primeiro_nome(aluno["aluno"])
-            inimigo_info = desafio.get("inimigo", "Ameaça")
-            motivo_falha = "escolheu a ação errada que bateu na resistência do inimigo" if not is_acao_correta else "falhou no teste do livro/dado"
-
-            contexto = (
-                f"MUNDO BASE: '{st.session_state.mundo_mestre}'. RODADA: {rodada_atual}/{tot_rodadas}.\n"
-                f"INIMIGO: {inimigo_info}.\n"
-                f"AÇÃO TENTADA: {acao_atual}.\n"
-                f"RESULTADO: FALHA! {aluno['personagem']} ({p_nome}) {motivo_falha} e foi congelado pela ameaça!"
-            )
-
-            vivos_restantes = [v for v in vivos if v["aluno"] != aluno["aluno"]]
-
-            with st.spinner("Registrando falha..."):
-                narrativa, p_img = gerar_narrativa_rpg(
-                    together_key, contexto, herois_vivos=vivos_restantes, heroi_ativo=aluno
-                )
-                img = gerar_imagem(p_img, together_key)
-
-                st.session_state.historico.append({
-                    "texto": narrativa,
-                    "img": img,
-                    "heroi": f"Falha de {aluno['personagem']}",
-                })
-                st.session_state.rodada_atual += 1
-                st.session_state.pergunta_atual = None
-                st.session_state.desafio_atual = None
-                st.session_state.pop("ultimo_dado", None)
-                sortear_proximo_aluno_automatico(aluno)
-                st.rerun()
-
-        # Exibição do Card do Inimigo com Pista
-        st.error(f"👾 **Ameaça:** {desafio.get('inimigo', 'Inimigo Misterioso')}\n\n📖 **Pista:** {desafio.get('descricao', '')}")
-
-        st.markdown("#### 🎯 Escolha a Estratégia Tática:")
-        acoes_lista = desafio.get("acoes", [])
-        opcoes_texto = [a["texto"] for a in acoes_lista]
-# 2. SELEÇÃO DA ESTRATÉGIA
-    st.markdown("#### 🎯 Passo 1: Escolha sua Estratégia Tática")
     acoes_lista = desafio.get("acoes", [])
     opcoes_texto = [a["texto"] for a in acoes_lista]
 
@@ -1171,19 +1035,17 @@ else:
         acao_selecionada = st.radio(
             "Leia a pista com atenção e escolha a única ação capaz de superar este desafio:",
             options=opcoes_texto,
-            key=f"radio_acao_{rodada_atual}_{aluno['aluno']}", # <-- Chave 100% segura agora
+            key=f"radio_acao_{rodada_atual}_{aluno['aluno']}",
         )
-        
-        # Validação interna da ação (Silenciosa, o resultado só sai no botão de Avançar)
+
         acao_obj = next((a for a in acoes_lista if a["texto"] == acao_selecionada), None)
         is_estrategia_correta = acao_obj.get("correta", False) if acao_obj else False
-        
+
         st.session_state["acao_escolhida"] = acao_selecionada
         st.session_state["acao_correta"] = is_estrategia_correta
 
     st.divider()
-        
-    # --- DADO & PERGUNTA (HABILITAÇÃO) ---
+
     c1, c2 = st.columns(2)
     with c1:
         if st.button("🎲 Rolar D20 com Animação", use_container_width=True):
@@ -1197,13 +1059,9 @@ else:
             elif dado_val == 1:
                 st.error(f"🎲 Resultado: **{dado_val}** — 💀 FALHA CRÍTICA!")
             elif dado_val >= dc_atual:
-                st.success(
-                    f"🎲 Resultado: **{dado_val}** (Superou a DC {dc_atual}! ✅)"
-                )
+                st.success(f"🎲 Resultado: **{dado_val}** (Superou a DC {dc_atual}! ✅)")
             else:
-                st.error(
-                    f"🎲 Resultado: **{dado_val}** (Abaixo da DC {dc_atual}... ❌)"
-                )
+                st.error(f"🎲 Resultado: **{dado_val}** (Abaixo da DC {dc_atual}... ❌)")
 
     with c2:
         if st.button("📖 Gerar Pergunta do Livro", use_container_width=True):
@@ -1214,24 +1072,20 @@ else:
                     st.session_state.get("faixa_etaria", "Ensino Fundamental I"),
                 )
 
-        # Exibe a pergunta e as opções limpas
         if st.session_state.pergunta_atual:
             p_obj = st.session_state.pergunta_atual
-            
             st.warning(f"**Pergunta sobre '{aluno['livro']}':**\n\n{p_obj['pergunta']}")
-            
+
             resposta_aluno_idx = st.radio(
                 "Escolha a alternativa correta:",
                 options=range(len(p_obj["opcoes"])),
                 format_func=lambda i: p_obj["opcoes"][i],
-                key=f"resp_livro_{rodada_atual}_{aluno['aluno']}"
+                key=f"resp_livro_{rodada_atual}_{aluno['aluno']}",
             )
-            
-            # Validação SILENCIOSA para o Mestre
-            st.session_state["passou_habilitacao"] = (resposta_aluno_idx == p_obj["resposta_correta"])
-            
-    # IMPORTANTE: Se houver qualquer outro 'if st.session_state.pergunta_atual:' 
-    # solto aqui embaixo no seu arquivo original, APAGUE-O!
+
+            st.session_state["passou_habilitacao"] = (
+                resposta_aluno_idx == p_obj["resposta_correta"]
+            )
 
     st.divider()
     st.markdown("### 📜 Diário da Jornada")
