@@ -683,7 +683,7 @@ with st.sidebar:
                             sortear_proximo_aluno_automatico(aluno_selecionado)
                             st.rerun()
 
-            if st.button("🔄 Resortear Herói", use_container_width=True):
+            if st.button("🔄 Sortear Novamente", use_container_width=True):
                 sortear_proximo_aluno_automatico(
                     st.session_state.aluno_sorteado
                 )
@@ -691,122 +691,108 @@ with st.sidebar:
                 st.session_state.desafio_atual = None
                 st.session_state.pop("ultimo_dado", None)
                 st.rerun()
+                st.subheader("2. Decisão do Mestre (Raio-X)")
+        if aluno_selecionado:
+            acao_escolhida_texto = st.session_state.get("acao_escolhida", "Ação Tática")
+            inimigo_info = st.session_state.desafio_atual.get("inimigo", "Ameaça") if st.session_state.desafio_atual else "Ameaça"
 
-            st.subheader("2. Decisão do Mestre")
-            if aluno_selecionado:
-                acao_escolhida_texto = st.session_state.get(
-                    "acao_escolhida", "Ação Tática"
-                )
-                is_acao_correta = st.session_state.get("acao_correta", False)
-                inimigo_info = st.session_state.desafio_atual.get("inimigo", "Ameaça") if st.session_state.desafio_atual else "Ameaça"
+            # 1. Coleta os gabaritos da rodada
+            estrategia_ok = st.session_state.get("acao_correta", False)
+            livro_ok = st.session_state.get("passou_habilitacao", False)
+            dado_rolado = st.session_state.get("ultimo_dado", 0)
+            
+            # 2. Verifica a dificuldade atual
+            dc_atual = calcular_dificuldade_rodada(st.session_state.rodada_atual, tot_rodadas)
+            dado_ok = dado_rolado >= dc_atual
 
-                # INDICADOR EM TEMPO REAL PARA O MESTRE
-                if is_acao_correta:
-                    st.success("🎯 **Validação Tática:** Estratégia CORRETA!")
-                else:
-                    st.warning("⚠️ **Validação Tática:** Estratégia INEFICAZ (Bate na resistência).")
+            # 3. Exibe o "Raio-X" da jogada para o Mestre
+            st.write("**Raio-X da Rodada:**")
+            st.write(f"- Pergunta do Livro: {'✅' if livro_ok else '❌'}")
+            st.write(f"- Estratégia Tática: {'✅' if estrategia_ok else '❌'}")
+            st.write(f"- Rolagem do Dado ({dado_rolado} vs DC {dc_atual}): {'✅' if dado_ok else '❌'}")
 
-                if st.button(
-                    "✅ SUCESSO (+3 Moedas)",
-                    type="primary",
-                    use_container_width=True,
-                ):
-                    aluno_selecionado["moedas"] = (
-                        aluno_selecionado.get("moedas", 0) + 3
-                    )
+            # 4. Cálculo Automático
+            sucesso_automatico = estrategia_ok and livro_ok and dado_ok
+
+            if sucesso_automatico:
+                st.success("🤖 **Sistema:** SUCESSO matemático detectado!")
+            else:
+                st.error("🤖 **Sistema:** FALHA matemática detectada.")
+
+            # 5. O Interruptor Mágico (Override do Mestre)
+            st.divider()
+            forcar_sucesso = st.toggle("✨ Substituir regra e Forçar SUCESSO (Decisão do Mestre)")
+            resultado_final = sucesso_automatico or forcar_sucesso
+
+            # 6. Botão Único de Avançar
+            if st.button("➡️ Avançar a História", type="primary", use_container_width=True):
+                p_nome = obter_primeiro_nome(aluno_selecionado["aluno"])
+                
+                if resultado_final:
+                    # ==========================================
+                    # LÓGICA DE SUCESSO
+                    # ==========================================
+                    aluno_selecionado["moedas"] = aluno_selecionado.get("moedas", 0) + 3
                     if random.random() < 0.30:
                         aluno_selecionado["tem_porcao_resgate"] = True
-                        st.toast(
-                            f"✨ {obter_primeiro_nome(aluno_selecionado['aluno'])} ganhou uma Poção!"
-                        )
+                        st.toast(f"✨ {p_nome} ganhou uma Poção!")
 
-                    p_nome = obter_primeiro_nome(aluno_selecionado["aluno"])
-                    cena_anterior = (
-                        st.session_state.historico[-1]["texto"]
-                        if st.session_state.historico
-                        else "Início da jornada."
-                    )
-
+                    cena_anterior = st.session_state.historico[-1]["texto"] if st.session_state.historico else "Início da jornada."
                     contexto = (
                         f"MUNDO BASE: '{st.session_state.mundo_mestre}'. RODADA: {st.session_state.rodada_atual}/{tot_rodadas}. "
                         f"CENA ANTERIOR: {cena_anterior}\n"
                         f"INIMIGO DA RODADA: {inimigo_info}.\n"
                         f"AÇÃO ESCOLHIDA: {acao_escolhida_texto}.\n"
-                        f"STATUS DA AÇÃO: {'ESTRATÉGIA CORRETA (EXPLOROU FRAQUEZA)' if is_acao_correta else 'ESTRATÉGIA PARCIAL (SUPERADA NO ESFORÇO)'}.\n"
+                        f"STATUS: SUCESSO! O herói superou o obstáculo.\n"
                         f"DESEMPENHO: {aluno_selecionado['personagem']} ({p_nome}) usou o item '{aluno_selecionado['item']}' e VENCEU! "
                         f"INSTRUÇÃO: Narre a vitória enfatizando como o herói superou a ameaça '{inimigo_info}'."
                     )
 
                     with st.spinner("Gerando sucesso..."):
-                        narrativa, p_img = gerar_narrativa_rpg(
-                            together_key,
-                            contexto,
-                            herois_vivos=vivos,
-                            heroi_ativo=aluno_selecionado,
-                        )
+                        narrativa, p_img = gerar_narrativa_rpg(together_key, contexto, herois_vivos=vivos, heroi_ativo=aluno_selecionado)
                         img = gerar_imagem(p_img, together_key)
 
-                        st.session_state.roteiro_hq.append(
-                            f"RODADA {st.session_state.rodada_atual}: [SUCESSO - {acao_escolhida_texto}] {aluno_selecionado['personagem']} venceu {inimigo_info}."
-                        )
-                        st.session_state.historico.append({
-                            "texto": narrativa,
-                            "img": img,
-                            "heroi": f"Sucesso de {aluno_selecionado['personagem']} contra {inimigo_info}",
-                        })
-                        st.session_state.rodada_atual += 1
-                        st.session_state.pergunta_atual = None
-                        st.session_state.desafio_atual = None
-                        st.session_state.pop("ultimo_dado", None)
-                        sortear_proximo_aluno_automatico(aluno_selecionado)
-                        st.rerun()
+                        st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [SUCESSO - {acao_escolhida_texto}] {aluno_selecionado['personagem']} venceu {inimigo_info}.")
+                        st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Sucesso de {aluno_selecionado['personagem']}"})
 
-                if st.button("❌ REGISTRAR FALHA", use_container_width=True):
+                else:
+                    # ==========================================
+                    # LÓGICA DE FALHA
+                    # ==========================================
                     for j in st.session_state.jogadores:
                         if j["aluno"] == aluno_selecionado["aluno"]:
                             j["status"] = "CONGELADO"
-
-                    p_nome = obter_primeiro_nome(aluno_selecionado["aluno"])
 
                     contexto = (
                         f"MUNDO BASE: '{st.session_state.mundo_mestre}'. RODADA: {st.session_state.rodada_atual}/{tot_rodadas}. "
                         f"INIMIGO DA RODADA: {inimigo_info}.\n"
                         f"AÇÃO TENTADA: {acao_escolhida_texto}.\n"
-                        f"STATUS DA AÇÃO: {'ACERTOU A ESTRATÉGIA, MAS FALHOU NO TESTE' if is_acao_correta else 'FALHOU POIS ESCOLHEU A AÇÃO INCORRETA (RESISTIDA)'}.\n"
+                        f"STATUS: FALHA! O herói não conseguiu superar o desafio.\n"
                         f"DESEMPENHO: {aluno_selecionado['personagem']} ({p_nome}) foi congelado. "
                         f"INSTRUÇÃO: Narre a falha e o congelamento do herói, destacando a reação da ameaça."
                     )
 
-                    vivos_restantes = [
-                        v
-                        for v in vivos
-                        if v["aluno"] != aluno_selecionado["aluno"]
-                    ]
+                    vivos_restantes = [v for v in vivos if v["aluno"] != aluno_selecionado["aluno"]]
 
                     with st.spinner("Gerando falha..."):
-                        narrativa, p_img = gerar_narrativa_rpg(
-                            together_key,
-                            contexto,
-                            herois_vivos=vivos_restantes,
-                            heroi_ativo=aluno_selecionado,
-                        )
+                        narrativa, p_img = gerar_narrativa_rpg(together_key, contexto, herois_vivos=vivos_restantes, heroi_ativo=aluno_selecionado)
                         img = gerar_imagem(p_img, together_key)
 
-                        st.session_state.roteiro_hq.append(
-                            f"RODADA {st.session_state.rodada_atual}: [FALHA - {acao_escolhida_texto}] {aluno_selecionado['personagem']} perante {inimigo_info}."
-                        )
-                        st.session_state.historico.append({
-                            "texto": narrativa,
-                            "img": img,
-                            "heroi": f"Falha de {aluno_selecionado['personagem']}",
-                        })
-                        st.session_state.rodada_atual += 1
-                        st.session_state.pergunta_atual = None
-                        st.session_state.desafio_atual = None
-                        st.session_state.pop("ultimo_dado", None)
-                        sortear_proximo_aluno_automatico(aluno_selecionado)
-                        st.rerun()
+                        st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [FALHA - {acao_escolhida_texto}] {aluno_selecionado['personagem']} caiu perante {inimigo_info}.")
+                        st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Falha de {aluno_selecionado['personagem']}"})
 
+                # ==========================================
+                # LIMPEZA COMUM DA RODADA E AVANÇO
+                # ==========================================
+                st.session_state.rodada_atual += 1
+                st.session_state.pergunta_atual = None
+                st.session_state.desafio_atual = None
+                st.session_state.pop("ultimo_dado", None)
+                st.session_state.pop("acao_escolhida", None)
+                st.session_state.pop("acao_correta", None)
+                st.session_state.pop("passou_habilitacao", None)
+                sortear_proximo_aluno_automatico(aluno_selecionado)
+                st.rerun()
         elif is_chefe_rodada:
             st.subheader("🐉 Batalha do Chefe Final")
             trio_selecionado = st.multiselect(
