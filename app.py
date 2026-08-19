@@ -543,29 +543,31 @@ with st.sidebar:
     st.divider()
 
 # 1. Dicionário que mapeia o NOME AMIGÁVEL para o ID REAL do modelo
-    modelos_disponiveis = {
-        "Llama 3.3 70B (Padrão - Equilibrado e Robusto)": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-        "Qwen 2.5 72B (Rápido e Preciso em JSON)": "Qwen/Qwen2.5-72B-Instruct-Turbo",
-        "DeepSeek V3 (Lógica e Raciocínio Apurado)": "deepseek-ai/DeepSeek-V3",
-        "Llama 3.1 8B (Ultra Rápido - Econômico)": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
-    }
+modelos_disponiveis = {
+    "Llama 3.3 70B (Padrão - Equilibrado e Robusto)": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+    "Qwen 2.5 72B (Rápido e Preciso em JSON)": "Qwen/Qwen2.5-72B-Instruct-Turbo",
+    "DeepSeek V3 (Lógica e Raciocínio Apurado)": "deepseek-ai/DeepSeek-V3",
+    "Llama 3.1 8B (Ultra Rápido - Econômico)": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
+}
 
-    # 2. O selectbox exibe apenas a lista das CHAVES (os nomes legíveis)
-    modelo_escolhido = st.selectbox(
-        "🤖 Modelo da Narrativa:",
-        options=list(modelos_disponiveis.keys()),
-    )
+# Usamos o 'key' para o Streamlit gerenciar a memória sozinho
+st.sidebar.selectbox(
+    "🤖 Modelo da Narrativa:",
+    options=list(modelos_disponiveis.keys()),
+    key="nome_modelo_amigavel"
+)
 
-    # 3. Mapeia a escolha e salva o ID REAL no session_state
-    st.session_state["modelo_together"] = modelos_disponiveis[modelo_escolhido]
+# Resgata o nome amigável (ou o padrão se der erro) e converte para o ID real
+nome_amigavel = st.session_state.get("nome_modelo_amigavel", "Llama 3.3 70B (Padrão - Equilibrado e Robusto)")
+st.session_state["modelo_together"] = modelos_disponiveis.get(nome_amigavel, "meta-llama/Llama-3.3-70B-Instruct-Turbo")
 
-    modelo_flux = st.selectbox(
-        "🎨 Modelo de Imagem FLUX:",
-        ["black-forest-labs/FLUX.1-schnell", "black-forest-labs/FLUX.1-dev"],
-    )
-    st.session_state["modelo_flux"] = modelo_flux
+modelo_flux = st.selectbox(
+    "🎨 Modelo de Imagem FLUX:",
+    ["black-forest-labs/FLUX.1-schnell", "black-forest-labs/FLUX.1-dev"],
+)
+st.session_state["modelo_flux"] = modelo_flux
 
-    if not st.session_state.partida_iniciada:
+if not st.session_state.partida_iniciada:
         st.header("⚙️ Parâmetros do Jogo")
         st.session_state["total_rodadas"] = st.slider(
             "Número de Rodadas:", min_value=5, max_value=35, value=20
