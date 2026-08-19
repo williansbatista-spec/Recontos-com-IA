@@ -200,10 +200,10 @@ def gerar_desafio_inimigo(together_key, mundo_mestre, jogadores, rodada, total_r
     modelo = st.session_state.get("modelo_together", "meta-llama/Llama-3.3-70B-Instruct-Turbo")
     faixa = st.session_state.get("faixa_etaria", "Ensino Fundamental I")
     
-    personagens_escolhidos = [j["personagem"] for j in jogadores]
-    livros_lidos = list(set([j["livro"] for j in jogadores]))
+    # --- DEFINIÇÃO SEGURA DAS VARIÁVEIS ---
+    personagens_escolhidos = [j.get("personagem", "Herói") for j in jogadores]
+    livros_lidos = list(set([j.get("livro", "Livro Desconhecido") for j in jogadores]))
 
-    # O prompt agora exige apenas um NÚMERO para a resposta correta
     prompt_sistema = f"""
     Você é um Mestre de RPG pedagógico infantil ({faixa}).
     Crie um inimigo ou obstáculo inspirado nos livros da turma ({', '.join(livros_lidos)}).
@@ -212,20 +212,70 @@ def gerar_desafio_inimigo(together_key, mundo_mestre, jogadores, rodada, total_r
     1. Jamais use nenhum destes personagens dos alunos como vilão: {', '.join(personagens_escolhidos)}.
     2. A descrição do inimigo DEVE conter uma PISTA IMPLÍCITA sobre seu ponto fraco/vulnerabilidade.
     3. Gere de 3 a 4 ações táticas para o aluno escolher.
+    4. PROIBIDO FUGIR: Nunca crie opções de ignorar, desviar, fugir ou procurar outro caminho. TODAS as opções devem ser tentativas ativas de enfrentar, atacar ou investigar a ameaça diretamente.
     
     FORMATO JSON ESTRITO (Responda APENAS o JSON):
     {{
       "inimigo": "Nome do Inimigo",
       "descricao": "Descrição narrativa com a pista implícita do ponto fraco.",
       "acoes": [
-        "Ação 1 (Incorreta - bate na resistência)",
+        "Ação 1 (Incorreta - bate na resistência, mas tenta enfrentar)",
         "Ação 2 (A única Correta - explora a fraqueza)",
-        "Ação 3 (Incorreta - não funciona)"
+        "Ação 3 (Incorreta - não funciona, mas tenta enfrentar)"
       ],
       "indice_correto": 1
     }}
     O campo 'indice_correto' DEVE SER um número inteiro (0 para a 1ª ação, 1 para a 2ª, etc) indicando a ÚNICA ação certa.
     """
+
+    prompt_user = f"Gere o desafio para a rodada {rodada}/{total_rodadas} no universo do livro '{mundo_mestre}'."
+
+    try:
+        response = client.chat.completions.create(
+            model=modelo,
+            messages=[
+                {"role": "system", "content": prompt_sistema},
+                {"role": "user", "content": prompt_user},
+            ],
+            max_tokens=600,
+            temperature=0.6,
+        )
+        conteudo = response.choices[0].message.content.strip()
+        
+        match = re.search(r"\{.*\}", conteudo, re.DOTALL)
+        if match:
+            dados_brutos = json.loads(match.group(0))
+            
+            # --- BLINDAGEM DO PYTHON (FORÇANDO APENAS 1 AÇÃO CORRETA) ---
+            acoes_formatadas = []
+            lista_textos = dados_brutos.get("acoes", [])
+            idx_certo = dados_brutos.get("indice_correto", 0)
+            
+            for i, texto_acao in enumerate(lista_textos):
+                acoes_formatadas.append({
+                    "texto": texto_acao,
+                    "correta": (i == idx_certo) # Só será Verdadeiro se o índice for exatamente o escolhido
+                })
+            
+            return {
+                "inimigo": dados_brutos.get("inimigo", "Ameaça"),
+                "descricao": dados_brutos.get("descricao", ""),
+                "acoes": acoes_formatadas
+            }
+            
+    except Exception as e:
+        st.warning(f"Erro ao gerar desafio com validação única: {e}")
+
+    # Retorno de segurança
+    return {
+        "inimigo": "Guardião de Pedra Vulcânica",
+        "descricao": "Sua carcaça de pedra é imune a força física, mas suas articulações do joelho estão cobertas de limo escorregadio.",
+        "acoes": [
+            {"texto": "⚔️ Golpear a carcaça no peito", "correta": False},
+            {"texto": "🔍 Focar o ataque nas articulações escorregadias do joelho", "correta": True},
+            {"texto": "🎨 Tentar assustar a criatura", "correta": False}
+        ]
+    }
 
     prompt_user = f"Gere o desafio para a rodada {rodada}/{total_rodadas} no universo do livro '{mundo_mestre}'."
 
