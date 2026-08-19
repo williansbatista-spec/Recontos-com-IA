@@ -442,19 +442,16 @@ def gerar_narrativa_rpg(
 
 
 def gerar_imagem(prompt_text, together_key):
-    if not together_key:
+    if not together_key or not prompt_text:
         return None
     try:
-        modelo_imagem = st.session_state.get(
-            "Qwen/Qwen-Image", "Qwen/Qwen-Image"
-        )
         url = "https://api.together.xyz/v1/images/generations"
         payload = {
             "model": "Qwen/Qwen-Image",
             "prompt": prompt_text,
             "width": 1024,
             "height": 768,
-            "steps": 4,
+            "steps": 30,  # 👈 AUMENTADO DE 4 PARA 30! Isso resolve o problema de qualidade.
             "n": 1,
             "response_format": "b64_json",
         }
