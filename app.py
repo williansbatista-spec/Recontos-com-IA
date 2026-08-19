@@ -445,12 +445,12 @@ def gerar_imagem(prompt_text, together_key):
     if not together_key:
         return None
     try:
-        modelo_flux = st.session_state.get(
-            "modelo_flux", "black-forest-labs/FLUX.1-schnell"
+        modelo_Qwen/Qwen-Image = st.session_state.get(
+            ""Qwen/Qwen-Image"", "Qwen/Qwen-Image"
         )
         url = "https://api.together.xyz/v1/images/generations"
         payload = {
-            "model": modelo_flux,
+            "model": "Qwen/Qwen-Image",
             "prompt": prompt_text,
             "width": 1024,
             "height": 768,
@@ -477,7 +477,7 @@ def gerar_imagem(prompt_text, together_key):
                 return item["url"]
         return None
     except Exception as e:
-        st.error(f"Erro ao gerar imagem no Together AI (FLUX): {e}")
+        st.error(f"Erro ao gerar imagem com Qwen-Image: {e}")
         return None
 
 
