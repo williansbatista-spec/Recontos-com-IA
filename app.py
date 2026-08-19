@@ -545,7 +545,7 @@ with st.sidebar:
 # 1. Dicionário que mapeia o NOME AMIGÁVEL para o ID REAL do modelo
 modelos_disponiveis = {
     "Llama 3.3 70B (Padrão - Equilibrado e Robusto)": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-    "Qwen 2.5 72B (Rápido e Preciso em JSON)": "Qwen/Qwen2.5-72B-Instruct-Turbo",
+    "Qwen 2.5 72B (Rápido e Preciso em JSON)": "Qwen/Qwen2.5-72B-Instruct",
     "DeepSeek V3 (Lógica e Raciocínio Apurado)": "deepseek-ai/DeepSeek-V3",
     "Llama 3.1 8B (Ultra Rápido - Econômico)": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
 }
