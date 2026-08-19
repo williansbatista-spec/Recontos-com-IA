@@ -568,29 +568,29 @@ modelo_flux = st.selectbox(
 st.session_state["modelo_flux"] = modelo_flux
 
 if not st.session_state.partida_iniciada:
-        st.header("⚙️ Parâmetros do Jogo")
-        st.session_state["total_rodadas"] = st.slider(
-            "Número de Rodadas:", min_value=5, max_value=35, value=20
-        )
-        st.session_state["faixa_etaria"] = st.selectbox(
-            "Faixa Etária:",
-            [
-                "Ensino Fundamental I (1º ao 3º ano)",
-                "Ensino Fundamental I (4º e 5º ano)",
-                "Ensino Fundamental II",
-            ],
-        )
-        st.session_state["estilo_arte"] = st.selectbox(
-            "🎨 Estilo Visual:",
-            [
-                "Children's Storybook Illustration, vibrant colors, flat design",
-                "Studio Ghibli Anime Style, magical atmosphere",
-                "16-bit Retro Video Game Pixel Art",
-                "Soft Watercolor Painting, fantasy children book",
-                "3D Pixar CGI Animation style, cute and highly detailed",
-            ],
-        )
-    else:
+    st.header("⚙️ Parâmetros do Jogo")
+    st.session_state["total_rodadas"] = st.slider(
+        "Número de Rodadas:", min_value=5, max_value=35, value=20
+    )
+    st.session_state["faixa_etaria"] = st.selectbox(
+        "Faixa Etária:",
+        [
+            "Ensino Fundamental I (1º ao 3º ano)",
+            "Ensino Fundamental I (4º e 5º ano)",
+            "Ensino Fundamental II",
+        ],
+    )
+    st.session_state["estilo_arte"] = st.selectbox(
+        "🎨 Estilo Visual:",
+        [
+            "Children's Storybook Illustration, vibrant colors, flat design",
+            "Studio Ghibli Anime Style, magical atmosphere",
+            "16-bit Retro Video Game Pixel Art",
+            "Soft Watercolor Painting, fantasy children book",
+            "3D Pixar CGI Animation style, cute and highly detailed",
+        ],
+    )
+else:
         st.divider()
         st.header("🕹️ Painel do Mestre")
 
