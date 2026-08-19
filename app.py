@@ -1030,20 +1030,57 @@ else:
     opcoes_texto = [a["texto"] for a in acoes_lista]
 
             # --- RESOLUÇÃO DO TURNO PELO MESTRE ---
-    st.subheader("3. Resolução da Jogada")
-    is_acao_correta = st.session_state.get("acao_correta", False)
-    acao_atual = st.session_state.get("acao_escolhida", None)
+   # ==========================================
+    # GERAÇÃO DO DESAFIO
+    # ==========================================
+    if aluno and rodada_atual < tot_rodadas - 1:
+        st.markdown(gerar_frase_convocacao(aluno))
 
-    col_btn1, col_btn2 = st.columns(2)
+        if not st.session_state.desafio_atual:
+            with st.spinner("⚠️ Um novo inimigo surge..."):
+                st.session_state.desafio_atual = gerar_desafio_inimigo(
+                    together_key,
+                    st.session_state.mundo_mestre,
+                    st.session_state.jogadores,
+                    rodada_atual,
+                    tot_rodadas,
+                )
 
-    with col_btn1:
-        # O botão de SUCESSO só fica ativo se a ação escolhida for a CORRETA
-        if st.button(
-            "🎉 Confirmar SUCESSO (+3 Moedas)",
-            type="primary",
-            disabled=not is_acao_correta,
-            use_container_width=True,
-        ):
+        desafio = st.session_state.desafio_atual
+
+        # ÚNICA Exibição do Inimigo e Pista
+        st.error(f"👾 **Ameaça:** {desafio.get('inimigo', 'Inimigo')}\n\n📖 **Pista:** {desafio.get('descricao', '')}")
+
+        # ==========================================
+        # PASSO 1: SELEÇÃO DA ESTRATÉGIA
+        # ==========================================
+        st.markdown("#### 🎯 Passo 1: Escolha sua Estratégia Tática")
+        acoes_lista = desafio.get("acoes", [])
+        opcoes_texto = [a["texto"] for a in acoes_lista]
+
+        if opcoes_texto:
+            acao_selecionada = st.radio(
+                "Leia a pista com atenção e escolha a única ação capaz de superar este desafio:",
+                options=opcoes_texto,
+                key=f"radio_acao_{rodada_atual}_{aluno['aluno']}",
+            )
+            
+            # Validação interna e silenciosa
+            acao_obj = next((a for a in acoes_lista if a["texto"] == acao_selecionada), None)
+            is_estrategia_correta = acao_obj.get("correta", False) if acao_obj else False
+            
+            st.session_state["acao_escolhida"] = acao_selecionada
+            st.session_state["acao_correta"] = is_estrategia_correta
+
+        st.divider()
+        
+        # ==========================================
+        # PASSO 2: DADO E LIVRO
+        # ==========================================
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("🎲 Rolar D20 com Animação", use_container_width=True):
+                # ... (resto do seu código do dado) ...
             aluno["moedas"] = aluno.get("moedas", 0) + 3
             if random.random() < 0.30:
                 aluno["tem_porcao_resgate"] = True
