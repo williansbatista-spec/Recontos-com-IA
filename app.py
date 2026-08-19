@@ -445,7 +445,7 @@ def gerar_imagem(prompt_text, together_key):
     if not together_key:
         return None
     try:
-        modelo_Qwen/Qwen-Image = st.session_state.get(
+        modelo_imagem = st.session_state.get(
             "Qwen/Qwen-Image", "Qwen/Qwen-Image"
         )
         url = "https://api.together.xyz/v1/images/generations"
