@@ -548,10 +548,10 @@ with st.sidebar:
     modelo_together = st.selectbox(
         "🤖 Modelo da Narrativa:",
         [
-            "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-            "Qwen/Qwen2.5-72B-Instruct-Turbo",
-            "deepseek-ai/DeepSeek-V3",
-            "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+            "Llama 3.3 70B (Padrão - Equilibrado e Robusto)": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+            "Qwen 2.5 72B (Rápido e Preciso em JSON)": "Qwen/Qwen2.5-72B-Instruct-Turbo",
+            "DeepSeek V3 (Lógica e Raciocínio Apurado)": "deepseek-ai/DeepSeek-V3",
+            "Llama 3.1 8B (Ultra Rápido - Econômico)": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
         ],
     )
     st.session_state["modelo_together"] = modelo_together
