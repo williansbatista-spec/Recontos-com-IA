@@ -545,16 +545,22 @@ with st.sidebar:
 
     st.divider()
 
-    modelo_together = st.selectbox(
+# 1. Dicionário que mapeia o NOME AMIGÁVEL para o ID REAL do modelo
+    modelos_disponiveis = {
+        "Llama 3.3 70B (Padrão - Equilibrado e Robusto)": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
+        "Qwen 2.5 72B (Rápido e Preciso em JSON)": "Qwen/Qwen2.5-72B-Instruct-Turbo",
+        "DeepSeek V3 (Lógica e Raciocínio Apurado)": "deepseek-ai/DeepSeek-V3",
+        "Llama 3.1 8B (Ultra Rápido - Econômico)": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
+    }
+
+    # 2. O selectbox exibe apenas a lista das CHAVES (os nomes legíveis)
+    modelo_escolhido = st.selectbox(
         "🤖 Modelo da Narrativa:",
-        [
-            "Llama 3.3 70B (Padrão - Equilibrado e Robusto)": "meta-llama/Llama-3.3-70B-Instruct-Turbo",
-            "Qwen 2.5 72B (Rápido e Preciso em JSON)": "Qwen/Qwen2.5-72B-Instruct-Turbo",
-            "DeepSeek V3 (Lógica e Raciocínio Apurado)": "deepseek-ai/DeepSeek-V3",
-            "Llama 3.1 8B (Ultra Rápido - Econômico)": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo"
-        ],
+        options=list(modelos_disponiveis.keys()),
     )
-    st.session_state["modelo_together"] = modelo_together
+
+    # 3. Mapeia a escolha e salva o ID REAL no session_state
+    st.session_state["modelo_together"] = modelos_disponiveis[modelo_escolhido]
 
     modelo_flux = st.selectbox(
         "🎨 Modelo de Imagem FLUX:",
