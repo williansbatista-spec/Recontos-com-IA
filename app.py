@@ -589,10 +589,26 @@ if not st.session_state.partida_iniciada:
     st.session_state["total_rodadas"] = st.slider(
         "Número de Rodadas:", min_value=5, max_value=35, value=20
     )
-    # 1. Nome da Turma (Substituiu a Faixa Etária)
-    nome_turma = st.sidebar.text_input(
-        "🎓 Turma (Ex: 1º A, 1º B, 1º C, 1º D, 1º E, 2º A, 2º B, 2º C, 2º D, 2º E, 2º F, 3º A, 3º B, 3º C, 3º D, 3º E, 4º A, 4º B, 4º C, 4º D, 4º E, 5º A, 5º B, 5º C, 5º D, 5º E):",
-        value="2º B",
+    # 1. Seleção da Turma (Gerada Automaticamente)
+    opcoes_turmas = []
+
+    # Aqui você define de qual ano até qual ano (ex: 1 ao 5)
+    anos = [1, 2, 3, 4, 5]
+    # Aqui você define as letras das turmas
+    letras = ["A", "B", "C", "D"]
+
+    # O Python mistura os dois automaticamente
+    for ano in anos:
+        for letra in letras:
+            opcoes_turmas.append(f"{ano}º Ano {letra}")
+
+    # Se quiser adicionar turmas sem número (opcional), é só inserir no começo:
+    opcoes_turmas.insert(0, "Educação Infantil")
+
+    nome_turma = st.sidebar.selectbox(
+        "🎓 Selecione a Turma:",
+        options=opcoes_turmas,
+        index=0,
         help="O sistema usará o número do ano para ajustar a dificuldade das palavras na história."
     )
     st.session_state["turma_atual"] = nome_turma
