@@ -580,7 +580,7 @@ if not st.session_state.partida_iniciada:
             "Ensino Fundamental II",
         ],
     )
-    st.session_state["estilo_arte"] = st.sidebarselectbox(
+    st.session_state["estilo_arte"] = st.sidebar.selectbox(
         "🎨 Estilo Visual:",
         [
         "3D Pixar CGI Animation style, highly detailed, expressive characters, cute, vibrant lighting",
