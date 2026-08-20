@@ -370,10 +370,22 @@ def gerar_narrativa_rpg(
     modelo = st.session_state.get(
         "modelo_together", "meta-llama/Llama-3.3-70B-Instruct-Turbo"
     )
-    faixa = st.session_state.get("faixa_etaria", "Ensino Fundamental I")
     estilo = st.session_state.get(
-        "estilo_arte", "vibrant children storybook style"
+        "estilo_arte", "3D Pixar CGI Animation style, highly detailed"
     )
+    
+    # Resgata o nome da turma digitado
+    turma = st.session_state.get("turma_atual", "2º B")
+
+    # 🕵️‍♂️ LÓGICA DE EXTRAÇÃO DO ANO ESCOLAR
+    # Procura o primeiro número (dígito) digitado no campo da turma
+    match_ano = re.search(r'\d+', turma)
+    if match_ano:
+        numero_ano = match_ano.group()
+        nivel_pedagogico = f"crianças do {numero_ano}º Ano do Ensino Fundamental"
+    else:
+        # Se você digitar apenas letras (ex: "Turma da Borboleta"), ele usa um padrão
+        nivel_pedagogico = "crianças do Ensino Fundamental I"
 
     lista_observadores = ""
     if herois_vivos:
@@ -381,25 +393,30 @@ def gerar_narrativa_rpg(
         if nomes:
             lista_observadores = f"In the background, observing or reacting, are other diverse young heroes: {', '.join(nomes)}."
 
+    # 🧠 INSTRUÇÃO DO MESTRE ATUALIZADA
     instrucao_mestre = f"""
-    Você é o Mestre de um RPG pedagógico infantil para a faixa etária: {faixa}.
+    Você é o Mestre de um RPG pedagógico.
+    O SEU PÚBLICO-ALVO SÃO: {nivel_pedagogico}. 
+    MUITO IMPORTANTE: Adapte rigorosamente o seu vocabulário, o tamanho das frases e a complexidade narrativa para a capacidade de leitura e compreensão de {nivel_pedagogico}.
     
     REGRAS RÍGIDAS DE NARRATIVA:
     1. Jamais use termos de morte ou violência real. Alunos derrotados são apenas 'congelados', 'capturados' ou 'expulsos da área'.
     2. NUNCA descongele ou salve um jogador congelado por conta própria na narrativa.
-    3. Quando o herói vence o desafio, TODA A COMITIVA de heróis avança junto para o próximo estágio em '{st.session_state.get('mundo_mestre', '')}'.
+    3. Quando o herói vence o desafio, TODA A COMITIVA de heróis avança junto para o próximo estágio.
     4. Se o contexto indicar 'Estratégia Correta', narre como o herói superou com genialidade a fraqueza da ameaça. Se indicar 'Estratégia Incorreta', mostre como o inimigo resistiu e repeliu o ataque.
     
     FORMATO DE RESPOSTA (ESTRITO):
     Responda ESTRITAMENTE em duas partes separadas por '---':
-    Parte 1: A narrativa da cena em português (até 2 parágrafos).
+    Parte 1: A narrativa da cena em português (até 2 parágrafos adequados para a idade).
     Parte 2: O prompt em INGLÊS muito detalhado para gerar a imagem. 
     OBRIGATÓRIO na Parte 2:
     - O estilo visual DEVE SER EXACTAMENTE este: "{estilo}".
     - {f"O foco central da imagem deve ser o herói em ação ({heroi_ativo['personagem']})." if heroi_ativo else "A imagem deve mostrar o grupo de heróis."}
     - {lista_observadores}
-    - Mantenha os traços e roupas dos personagens o mais consistentes possível com a classe/arquétipo deles.
+    - Mantenha os traços e roupas dos personagens consistentes.
     """
+    
+    # ... (O restante da função do is_intro e is_final continua igual, usando a variável 'turma' que já existe lá)
 
     if is_intro:
         prompt_contexto = (
@@ -572,14 +589,13 @@ if not st.session_state.partida_iniciada:
     st.session_state["total_rodadas"] = st.slider(
         "Número de Rodadas:", min_value=5, max_value=35, value=20
     )
-    st.session_state["faixa_etaria"] = st.sidebar.selectbox(
-        "Faixa Etária:",
-        [
-            "Ensino Fundamental I (1º ao 3º ano)",
-            "Ensino Fundamental I (4º e 5º ano)",
-            "Ensino Fundamental II",
-        ],
+    # 1. Nome da Turma (Substituiu a Faixa Etária)
+    nome_turma = st.sidebar.text_input(
+        "🎓 Turma (Ex: 1º A, 1º B, 1º C, 1º D, 1º E, 2º A, 2º B, 2º C, 2º D, 2º E, 2º F, 3º A, 3º B, 3º C, 3º D, 3º E, 4º A, 4º B, 4º C, 4º D, 4º E, 5º A, 5º B, 5º C, 5º D, 5º E):",
+        value="2º B",
+        help="O sistema usará o número do ano para ajustar a dificuldade das palavras na história."
     )
+    st.session_state["turma_atual"] = nome_turma
     st.session_state["estilo_arte"] = st.sidebar.selectbox(
         "🎨 Estilo Visual:",
         [
