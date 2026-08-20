@@ -572,7 +572,7 @@ if not st.session_state.partida_iniciada:
     st.session_state["total_rodadas"] = st.slider(
         "Número de Rodadas:", min_value=5, max_value=35, value=20
     )
-    st.session_state["faixa_etaria"] = st.selectbox(
+    st.session_state["faixa_etaria"] = st.sidebar.selectbox(
         "Faixa Etária:",
         [
             "Ensino Fundamental I (1º ao 3º ano)",
@@ -580,14 +580,14 @@ if not st.session_state.partida_iniciada:
             "Ensino Fundamental II",
         ],
     )
-    st.session_state["estilo_arte"] = st.selectbox(
+    st.session_state["estilo_arte"] = st.sidebarselectbox(
         "🎨 Estilo Visual:",
         [
-            "Children's Storybook Illustration, vibrant colors, flat design",
-            "Studio Ghibli Anime Style, magical atmosphere",
-            "16-bit Retro Video Game Pixel Art",
-            "Soft Watercolor Painting, fantasy children book",
-            "3D Pixar CGI Animation style, cute and highly detailed",
+        "3D Pixar CGI Animation style, highly detailed, expressive characters, cute, vibrant lighting",
+        "Studio Ghibli Anime Style, whimsical, magical atmosphere, detailed background",
+        "Classic Children's Storybook Illustration, soft watercolor painting, whimsical, pastel colors",
+        "Epic Digital Fantasy Art, vibrant colors, glowing magic, RPG concept art",
+        "16-bit Retro Video Game Pixel Art, detailed, colorful, RPG style",
         ],
     )
 else:
