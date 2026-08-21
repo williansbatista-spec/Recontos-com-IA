@@ -452,66 +452,6 @@ def gerar_narrativa_rpg(
     
     # ... (O restante da função do is_intro e is_final continua igual, usando a variável 'turma' que já existe lá)
 
-    # 1. NO PRÓLOGO (Rodada 1)
-if st.session_state.rodada_atual == 1:
-    col_img1, col_img2 = st.columns(2)
-
-    prompt_cenario = f"Children's storybook illustration style, 3D Pixar render. Wide panoramic view of {st.session_state.mundo_mestre}, magical fantasy world, epic landscape."
-    prompt_heroi = f"Children's storybook illustration style, 3D Pixar render. Cinematic close-up of {aluno_selecionado['personagem']} standing heroically, determined pose."
-
-    with st.spinner("🎨 Gerando panorama e herói da introdução..."):
-        img_mundo = gerar_imagem(
-            prompt_cenario, together_key, prompt_customizado=True
-        )
-        img_heroi = gerar_imagem(
-            prompt_heroi, together_key, prompt_customizado=True
-        )
-
-    with col_img1:
-        if img_mundo:
-            st.image(
-                img_mundo,
-                caption=f"🌐 {st.session_state.mundo_mestre}",
-                use_container_width=True,
-            )
-
-    with col_img2:
-        if img_heroi:
-            st.image(
-                img_heroi,
-                caption=f"⚔️ {aluno_selecionado['personagem']} Lidera a Ação",
-                use_container_width=True,
-            )
-            
-    if is_final:
-        prompt_contexto += " ESTA É A CENA FINAL! Narre a grande celebração vitoriosa e épica da turma após cumprirem a jornada."
-
-    try:
-        response = client.chat.completions.create(
-            model=modelo,
-            messages=[
-                {"role": "system", "content": instrucao_mestre},
-                {"role": "user", "content": prompt_contexto},
-            ],
-            max_tokens=1000,
-            temperature=0.7,
-        )
-        texto = response.choices[0].message.content
-    except Exception as e:
-        return (
-            f"Erro na narrativa (Together AI): {e}",
-            f"epic scene, {estilo}",
-        )
-
-    if "---" in texto:
-        narrativa, prompt_img = texto.split("---", 1)
-    else:
-        narrativa = texto
-        prompt_img = f"epic scene, {estilo}"
-
-    return narrativa.strip(), prompt_img.strip()
-
-
 def gerar_imagem(descricao_cena, together_key):
     if not together_key or not descricao_cena:
         return None
