@@ -34,46 +34,41 @@ def calcular_dificuldade_rodada(rodada_atual, total_rodadas):
 # ==========================================
 
 def construir_prompt_dinamico_imagem(descricao_cena):
-    """Constrói o prompt visual unindo o herói atual em destaque e o resultado do herói anterior ao fundo."""
+    """Constrói o prompt visual limpando quebras de linha e limitando o tamanho do texto."""
     heroi_atual = st.session_state.get("aluno_sorteado") or st.session_state.get("heroi_ativo", {})
     heroi_anterior = st.session_state.get("heroi_anterior", None)
     sucesso_anterior = st.session_state.get("sucesso_rodada_anterior", None)
 
-    nome_atual = heroi_atual.get("personagem", "the brave hero")
+    nome_atual = heroi_atual.get("personagem", "the brave hero") if isinstance(heroi_atual, dict) else "the brave hero"
 
     estilo = (
         "Children's storybook illustration style, 3D Pixar render, vibrant colors, "
         "epic fantasy lighting, dramatic perspective."
     )
 
-    primeiro_plano = f"In the dramatic foreground, {nome_atual} steps up heroically with a determined expression, preparing to take action."
+    primeiro_plano = f"In the dramatic foreground, {nome_atual} steps up heroically with a determined expression."
 
     segundo_plano = ""
     if heroi_anterior and isinstance(heroi_anterior, dict):
         nome_ant = heroi_anterior.get("personagem", "the previous hero")
         if sucesso_anterior is False:
-            segundo_plano = (
-                f"In the background, {nome_ant} is trapped inside a glowing blue magical ice crystal, "
-                f"looking at {nome_atual} with hope."
-            )
+            segundo_plano = f"In the background, {nome_ant} is trapped inside a glowing blue magical ice crystal."
         elif sucesso_anterior is True:
-            segundo_plano = (
-                f"In the background, {nome_ant} is catching their breath, cheering and giving a thumbs up "
-                f"to {nome_atual}."
-            )
+            segundo_plano = f"In the background, {nome_ant} is cheering and giving a thumbs up."
 
-    contexto_ambiente = f"Environment: {descricao_cena}."
+    # 🟢 LIMPEZA: Remove quebras de linha e limita a descrição a 150 caracteres
+    cena_limpa = str(descricao_cena).replace("\n", " ").replace("\r", " ").strip()
+    contexto_ambiente = f"Environment: {cena_limpa[:150]}"
 
     return f"{estilo} {primeiro_plano} {segundo_plano} {contexto_ambiente}"
 
 
 def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_ativo):
-    """Gera dois quadros do prólogo garantindo textos distintos para cada cena."""
+    """Gera dois quadros do prólogo garantindo a geração de imagem com fallback de segurança."""
     quadros = []
     
     nome_heroi = heroi_ativo.get("personagem", "o Jovem Herói") if isinstance(heroi_ativo, dict) else "o Jovem Herói"
 
-    # Textos narrativos distintos para o fallback de cada quadro
     textos_fallback = [
         f"A comitiva de heróis atravessa os portões mágicos e contempla as maravilhas do reino de '{mundo_mestre}'.",
         f"Uma grande ameaça surge no horizonte de '{mundo_mestre}'! O Mestre convoca o herói {nome_heroi} para liderar o grupo."
@@ -85,6 +80,7 @@ def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_a
     ]
 
     for idx, prompt_narrativo in enumerate(prompts_prologo, start=1):
+        # 1. Gera o texto da narrativa
         resultado = gerar_narrativa_rpg(
             together_key,
             prompt_narrativo,
@@ -93,14 +89,25 @@ def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_a
             heroi_ativo=heroi_ativo
         )
 
-        # Se a API retornar uma tupla válida, usa o texto da IA; senão, usa o fallback específico daquele quadro
         if isinstance(resultado, tuple) and len(resultado) == 2 and resultado[0]:
             narrativa = resultado[0]
         else:
             narrativa = textos_fallback[idx - 1]
 
+        # 2. Constrói o prompt limpo
         prompt_img = construir_prompt_dinamico_imagem(descricao_cena=narrativa)
-        img = gerar_imagem(prompt_img, together_key)
+
+        # 3. Geração da imagem com fallback
+        img = None
+        try:
+            img = gerar_imagem(prompt_img, together_key)
+        except Exception as err:
+            st.warning(f"Aviso na imagem do Quadro {idx}: {err}")
+
+        # Se a geração falhar ou retornar None, tenta com um prompt genérico simplificado
+        if not img:
+            prompt_simples = f"3D Pixar render style, epic fantasy realm {mundo_mestre}, heroic scene"
+            img = gerar_imagem(prompt_simples, together_key)
 
         quadros.append({
             "texto": narrativa,
