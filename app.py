@@ -452,17 +452,38 @@ def gerar_narrativa_rpg(
     
     # ... (O restante da função do is_intro e is_final continua igual, usando a variável 'turma' que já existe lá)
 
-    if is_intro:
-        prompt_contexto = (
-            f"INTRODUÇÃO DA AVENTURA: Apresente o reino fantástico do livro '{st.session_state.mundo_mestre}'. "
-            f"Descreva como a comitiva de heróis chegou a este lugar e apresente o primeiro grande desafio no horizonte! "
-            f"MUNDO BASE: '{st.session_state.mundo_mestre}'. RODADA: {st.session_state.rodada_atual}.\n"
+    # 1. NO PRÓLOGO (Rodada 1)
+if st.session_state.rodada_atual == 1:
+    col_img1, col_img2 = st.columns(2)
+
+    prompt_cenario = f"Children's storybook illustration style, 3D Pixar render. Wide panoramic view of {st.session_state.mundo_mestre}, magical fantasy world, epic landscape."
+    prompt_heroi = f"Children's storybook illustration style, 3D Pixar render. Cinematic close-up of {aluno_selecionado['personagem']} standing heroically, determined pose."
+
+    with st.spinner("🎨 Gerando panorama e herói da introdução..."):
+        img_mundo = gerar_imagem(
+            prompt_cenario, together_key, prompt_customizado=True
         )
-        if heroi_ativo:        
-            prompt_contexto += f"DESAFIO: O herói {heroi_ativo['personagem']} precisa agir.\n"
-            convocacao = f"{heroi_ativo['personagem']}, é hora de agir!"
+        img_heroi = gerar_imagem(
+            prompt_heroi, together_key, prompt_customizado=True
+        )
+
+    with col_img1:
+        if img_mundo:
+            st.image(
+                img_mundo,
+                caption=f"🌐 {st.session_state.mundo_mestre}",
+                use_container_width=True,
+            )
+
+    with col_img2:
+        if img_heroi:
+            st.image(
+                img_heroi,
+                caption=f"⚔️ {aluno_selecionado['personagem']} Lidera a Ação",
+                use_container_width=True,
+            )
             
-    elif is_final:
+    if is_final:
         prompt_contexto += " ESTA É A CENA FINAL! Narre a grande celebração vitoriosa e épica da turma após cumprirem a jornada."
 
     try:
@@ -494,6 +515,12 @@ def gerar_narrativa_rpg(
 def gerar_imagem(descricao_cena, together_key):
     if not together_key or not descricao_cena:
         return None
+    # Se for um quadro duplo (customizado), usa o texto direto. Caso contrário, usa o gerador dinâmico.
+    prompt_final = (
+        descricao_cena
+        if prompt_customizado
+        else construir_prompt_dinamico_imagem(descricao_cena)
+    )
 
     # 1. Gera o prompt dinâmico combinando o herói atual e o anterior
     prompt_final = construir_prompt_dinamico_imagem(descricao_cena)
@@ -779,6 +806,7 @@ else:
                 st.rerun()
                 st.sidebar.subheader("2. Decisão do Mestre (Raio-X)")
                 aluno_selecionado = st.session_state.get("aluno_sorteado")
+
         if aluno_selecionado:
             acao_escolhida_texto = st.session_state.get("acao_escolhida", "Ação Tática")
             inimigo_info = st.session_state.desafio_atual.get("inimigo", "Ameaça") if st.session_state.desafio_atual else "Ameaça"
@@ -787,7 +815,7 @@ else:
             estrategia_ok = st.session_state.get("acao_correta", False)
             livro_ok = st.session_state.get("passou_habilitacao", False)
             dado_rolado = st.session_state.get("ultimo_dado", 0)
-            
+
             # 2. Verifica a dificuldade atual
             dc_atual = calcular_dificuldade_rodada(st.session_state.rodada_atual, tot_rodadas)
             dado_ok = dado_rolado >= dc_atual
@@ -814,7 +842,7 @@ else:
             # 6. Botão Único de Avançar
             if st.sidebar.button("➡️ Avançar a História", type="primary", use_container_width=True):
                 p_nome = obter_primeiro_nome(aluno_selecionado["aluno"])
-                
+
                 if resultado_final:
                     # ==========================================
                     # LÓGICA DE SUCESSO
@@ -871,7 +899,6 @@ else:
                 # ==========================================
                 # LIMPEZA COMUM DA RODADA E AVANÇO
                 # ==========================================
-                # 🔄 PASSAGEM DE BASTÃO: Registra o herói atual e seu resultado para a próxima rodada
                 st.session_state["heroi_anterior"] = aluno_selecionado
                 st.session_state["sucesso_rodada_anterior"] = bool(resultado_final)
                 st.session_state.rodada_atual += 1
@@ -885,40 +912,116 @@ else:
                 st.rerun()
         elif is_chefe_rodada:
             st.subheader("🐉 Batalha do Chefe Final")
-            trio_selecionado = st.multiselect(
-                "Trio de Heróis:",
-                options=vivos,
-                default=vivos[:3] if len(vivos) >= 3 else vivos,
-                format_func=lambda j: f"{obter_primeiro_nome(j['aluno'])} ({j['personagem']})",
+
+            col_boss1, col_boss2 = st.columns(2)
+
+            prompt_boss = f"Children's storybook illustration style, 3D Pixar render. Giant intimidating boss monster {inimigo_info}, dramatic dark and glowing red fantasy lighting."
+            prompt_comitiva = "Children's storybook illustration style, 3D Pixar render. A united team of brave child heroes standing together in battle stances, ready to attack."
+
+            with st.spinner("⚔️ Gerando os visuais do Clímax..."):
+                img_boss = gerar_imagem(
+                    prompt_boss, together_key, prompt_customizado=True
+                )
+                img_grupo = gerar_imagem(
+                    prompt_comitiva, together_key, prompt_customizado=True
+                )
+
+            with col_boss1:
+                if img_boss:
+                    st.image(
+                        img_boss,
+                        caption=f"🔥 O Monstro Final: {inimigo_info}",
+                        use_container_width=True,
+                    )
+
+            with col_boss2:
+                if img_grupo:
+                    st.image(
+                        img_grupo,
+                        caption="🛡️ A Comitiva Reunida",
+                        use_container_width=True,
+                    )
+
+                st.subheader("🐉 Batalha do Chefe Final")
+                trio_selecionado = st.multiselect(
+                    "Trio de Heróis:",
+                    options=vivos,
+                    default=vivos[:3] if len(vivos) >= 3 else vivos,
+                    format_func=lambda j: f"{obter_primeiro_nome(j['aluno'])} ({j['personagem']})",
+                )
+
+                if len(trio_selecionado) == 3:
+                    if st.button(
+                        "🔥 DERROTAR CHEFE (+10 Moedas)",
+                        type="primary",
+                        use_container_width=True,
+                    ):
+                        for hero in trio_selecionado:
+                            hero["moedas"] = hero.get("moedas", 0) + 10
+
+                        nomes_trio = ", ".join(
+                            [f"{h['personagem']}" for h in trio_selecionado]
+                        )
+                        contexto_boss = f"MUNDO: '{st.session_state.mundo_mestre}'. O trio {nomes_trio} derrotou o Chefe Final!"
+
+                        with st.spinner("Derrotando chefe..."):
+                            narrativa, p_img = gerar_narrativa_rpg(
+                                together_key, contexto_boss, herois_vivos=vivos
+                            )
+                            img = gerar_imagem(p_img, together_key)
+                            st.session_state.historico.append({
+                                "texto": narrativa,
+                                "img": img,
+                                "heroi": "Vitória contra o Chefe",
+                            })
+                            st.session_state.rodada_atual += 1
+                            st.session_state.desafio_atual = None
+                            st.rerun()
+        else:
+            st.subheader("🏆 Encerrar Jogo")
+            if st.button(
+                "🎬 Gerar Gran Finale!", type="primary", use_container_width=True
+            ):
+                contexto = f"Mundo: {st.session_state.mundo_mestre}. A grande vitória de todos os heróis!"
+                with st.spinner("Finalizando história..."):
+                    narrativa, p_img = gerar_narrativa_rpg(
+                        together_key, contexto, is_final=True, herois_vivos=vivos
+                    )
+                    img_final = gerar_imagem(p_img, together_key)
+                    st.session_state.historico.append({
+                        "texto": narrativa,
+                        "img": img_final,
+                        "heroi": "VITÓRIA ÉPICA FINAL",
+                    })
+                    st.rerun()
+
+        st.divider()
+        if st.session_state.roteiro_hq:
+            st.download_button(
+                label="📥 Baixar Roteiro TXT",
+                data="\n\n".join(st.session_state.roteiro_hq),
+                file_name="roteiro_aula_rpg.txt",
+                mime="text/plain",
+                use_container_width=True,
             )
 
-            if len(trio_selecionado) == 3:
-                if st.button(
-                    "🔥 DERROTAR CHEFE (+10 Moedas)",
-                    type="primary",
-                    use_container_width=True,
-                ):
-                    for hero in trio_selecionado:
-                        hero["moedas"] = hero.get("moedas", 0) + 10
-
-                    nomes_trio = ", ".join(
-                        [f"{h['personagem']}" for h in trio_selecionado]
-                    )
-                    contexto_boss = f"MUNDO: '{st.session_state.mundo_mestre}'. O trio {nomes_trio} derrotou o Chefe Final!"
-
-                    with st.spinner("Derrotando chefe..."):
-                        narrativa, p_img = gerar_narrativa_rpg(
-                            together_key, contexto_boss, herois_vivos=vivos
-                        )
-                        img = gerar_imagem(p_img, together_key)
-                        st.session_state.historico.append({
-                            "texto": narrativa,
-                            "img": img,
-                            "heroi": "Vitória contra o Chefe",
-                        })
-                        st.session_state.rodada_atual += 1
-                        st.session_state.desafio_atual = None
-                        st.rerun()
+        if st.sidebar.button("🗑️ Reiniciar Jogo", use_container_width=True):
+            for key in [
+                "partida_iniciada",
+                "jogadores",
+                "mundo_mestre",
+                "rodada_atual",
+                "historico",
+                "roteiro_hq",
+                "aluno_sorteado",
+                "pergunta_atual",
+                "ultimo_dado",
+                "acao_escolhida",
+                "acao_correta",
+                "desafio_atual",
+            ]:
+                st.session_state.pop(key, None)
+            st.rerun()
 
         else:
             st.subheader("🏆 Encerrar Jogo")
