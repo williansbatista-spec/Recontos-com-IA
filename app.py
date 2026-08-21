@@ -649,7 +649,7 @@ else:
         is_chefe_rodada = st.session_state.rodada_atual == tot_rodadas - 1
         is_ultima_rodada = st.session_state.rodada_atual >= tot_rodadas
 
-        with st.expander("📋 Chamada / Presença", expanded=False):
+        with st.sidebar.expander("📋 Chamada / Presença", expanded=False):
             for idx, j in enumerate(st.session_state.jogadores):
                 is_p = st.checkbox(
                     f"{j['aluno']} ({j['personagem']})",
