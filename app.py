@@ -663,7 +663,7 @@ else:
                     st.rerun()
 
         if not is_chefe_rodada and not is_ultima_rodada:
-            st.subheader("1. Seleção do Herói")
+            st.sidebar.subheader("1. Seleção do Herói")
             if not st.session_state.aluno_sorteado and vivos:
                 sortear_proximo_aluno_automatico()
 
