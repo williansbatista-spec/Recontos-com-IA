@@ -29,18 +29,6 @@ def calcular_dificuldade_rodada(rodada_atual, total_rodadas):
     dc = int(8 + (progresso * 10))
     return min(dc, 18)
 
-
-def gerar_frase_convocacao(aluno):
-    if not aluno:
-        return ""
-    titulos = ["guerreiro(a)", "paladino(a)", "aventureiro(a)", "mago(a) supremo(a)"]
-    titulo = random.choice(titulos)
-    p_nome = obter_primeiro_nome(aluno.get("aluno", "Herói"))
-    personagem = aluno.get("personagem", "Aventureiro")
-
-    return f"📜 **O grande Mestre dos Jogos convoca o(a) {titulo} {personagem} ({p_nome}) para enfrentar este grande desafio!**"
-
-
 # ---------------------------------------------------------------------------
 # 2. CONFIGURAÇÃO DA PÁGINA E ESTADO DA SESSÃO
 # ---------------------------------------------------------------------------
@@ -424,11 +412,10 @@ def gerar_narrativa_rpg(
             f"Descreva como a comitiva de heróis chegou a este lugar e apresente o primeiro grande desafio no horizonte! "
             f"MUNDO BASE: '{st.session_state.mundo_mestre}'. RODADA: {st.session_state.rodada_atual}.\n"
         )
-        if heroi_ativo:
-            convocacao = gerar_frase_convocacao(heroi_ativo)
+        if heroi_ativo:        
             prompt_contexto += f"DESAFIO: O herói {heroi_ativo['personagem']} precisa agir.\n"
-            prompt_contexto += f"IMPORTANTE: Termine a narrativa exatamente com a frase: '{convocacao}'"
-
+            convocacao = f"{heroi_ativo['personagem']}, é hora de agir!"
+            
     elif is_final:
         prompt_contexto += " ESTA É A CENA FINAL! Narre a grande celebração vitoriosa e épica da turma após cumprirem a jornada."
 
