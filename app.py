@@ -903,7 +903,7 @@ else:
                 use_container_width=True,
             )
 
-        if st.button("🗑️ Reiniciar Jogo", use_container_width=True):
+        if st.sidebar.button("🗑️ Reiniciar Jogo", use_container_width=True):
             for key in [
                 "partida_iniciada",
                 "jogadores",
