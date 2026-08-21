@@ -29,51 +29,76 @@ def calcular_dificuldade_rodada(rodada_atual, total_rodadas):
     dc = int(8 + (progresso * 10))
     return min(dc, 18)
 
+# ==========================================
+# FUNÇÕES AUXILIARES DE IMAGEM E NARRATIVA
+# ==========================================
+
 def construir_prompt_dinamico_imagem(descricao_cena):
     """Constrói o prompt visual unindo o herói atual em destaque e o resultado do herói anterior ao fundo."""
-
-    # 1. Recupera as informações salvas da sessão
-    heroi_atual = st.session_state.get("heroi_ativo", {})
+    heroi_atual = st.session_state.get("aluno_sorteado") or st.session_state.get("heroi_ativo", {})
     heroi_anterior = st.session_state.get("heroi_anterior", None)
     sucesso_anterior = st.session_state.get("sucesso_rodada_anterior", None)
 
     nome_atual = heroi_atual.get("personagem", "the brave hero")
 
-    # 2. Estilo visual padrão
     estilo = (
         "Children's storybook illustration style, 3D Pixar render, vibrant colors, "
         "epic fantasy lighting, dramatic perspective."
     )
 
-    # 3. Primeiro Plano (Herói da Vez)
     primeiro_plano = f"In the dramatic foreground, {nome_atual} steps up heroically with a determined expression, preparing to take action."
 
-    # 4. Plano de Fundo (Consequência do Herói Anterior)
     segundo_plano = ""
-    if heroi_anterior:
+    if heroi_anterior and isinstance(heroi_anterior, dict):
         nome_ant = heroi_anterior.get("personagem", "the previous hero")
-
         if sucesso_anterior is False:
-            # Em caso de falha/congelamento
             segundo_plano = (
                 f"In the background, {nome_ant} is trapped inside a glowing blue magical ice crystal, "
                 f"looking at {nome_atual} with hope."
             )
         elif sucesso_anterior is True:
-            # Em caso de vitória na rodada anterior
             segundo_plano = (
                 f"In the background, {nome_ant} is catching their breath, cheering and giving a thumbs up "
                 f"to {nome_atual}."
             )
 
-    # 5. Descrição do ambiente/cenário atual
     contexto_ambiente = f"Environment: {descricao_cena}."
 
-    # Montagem final do prompt
-    prompt_completo = (
-        f"{estilo} {primeiro_plano} {segundo_plano} {contexto_ambiente}"
-    )
-    return prompt_completo
+    return f"{estilo} {primeiro_plano} {segundo_plano} {contexto_ambiente}"
+
+
+def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_ativo):
+    """Gera dois quadros narrativos e visuais utilizando o gerador de prompt dinâmico."""
+    quadros = []
+    
+    prompts_prologo = [
+        f"Apresentação do reino fantástico do livro '{mundo_mestre}' e a chegada da comitiva de heróis.",
+        f"O surgimento da primeira grande ameaça no horizonte de '{mundo_mestre}' e a convocação do herói {heroi_ativo.get('personagem', 'destacado')}."
+    ]
+    
+    for idx, contexto in enumerate(prompts_prologo, start=1):
+        # 1. Gera a narrativa via IA
+        narrativa, _ = gerar_narrativa_rpg(
+            together_key,
+            contexto,
+            is_intro=True,
+            herois_vivos=herois_vivos,
+            heroi_ativo=heroi_ativo
+        )
+        
+        # 2. Usa a sua função para montar o prompt de imagem
+        prompt_img = construir_prompt_dinamico_imagem(descricao_cena=narrativa)
+        
+        # 3. Gera a imagem correspondente
+        img = gerar_imagem(prompt_img, together_key)
+        
+        quadros.append({
+            "texto": narrativa,
+            "img": img,
+            "heroi": f"Prólogo - Quadro {idx}"
+        })
+        
+    return quadros
 
 # ---------------------------------------------------------------------------
 # 2. CONFIGURAÇÃO DA PÁGINA E ESTADO DA SESSÃO
@@ -455,14 +480,7 @@ def gerar_narrativa_rpg(
 def gerar_imagem(descricao_cena, together_key):
     if not together_key or not descricao_cena:
         return None
-    # Se for um quadro duplo (customizado), usa o texto direto. Caso contrário, usa o gerador dinâmico.
-    prompt_final = (
-        descricao_cena
-        if prompt_customizado
-        else construir_prompt_dinamico_imagem(descricao_cena)
-    )
-
-    # 1. Gera o prompt dinâmico combinando o herói atual e o anterior
+    # Gera o prompt dinâmico combinando o herói atual e o anterior.
     prompt_final = construir_prompt_dinamico_imagem(descricao_cena)
 
     # 2. Pega o modelo escolhido pelo usuário no menu lateral (padrão: Qwen-Image)
@@ -1023,7 +1041,9 @@ if not st.session_state.partida_iniciada:
                 st.dataframe(df, use_container_width=True)
 
                 if st.button(
-                    "🚀 Iniciar Aventura e Fixar Mundo!", type="primary"
+                    "🚀 Iniciar Aventura e Fixar Mundo!", 
+                    type="primary", 
+                    key="btn_iniciar_aventura_secao5"
                 ):
                     jogadores = []
                     for _, row in df.iterrows():
@@ -1045,36 +1065,24 @@ if not st.session_state.partida_iniciada:
                     )
                     sortear_proximo_aluno_automatico()
 
-                    with st.spinner("Gerando introdução épica do mundo..."):
-                        resultado = gerar_narrativa_rpg(
-                            together_key,
-                            "",
-                            is_intro=True,
+                    # --- GERAÇÃO DO PRÓLOGO EM QUADRO DUPLO ---
+                    with st.spinner("🎨 Gerando o prólogo em quadro duplo..."):
+                        quadros_prologo = gerar_prologo_quadro_duplo(
+                            together_key=together_key,
+                            mundo_mestre=st.session_state.mundo_mestre,
                             herois_vivos=jogadores,
                             heroi_ativo=st.session_state.aluno_sorteado,
                         )
 
-                        # Validação rigorosa do retorno antes do desempacotamento
-                        if isinstance(resultado, tuple) and len(resultado) == 2:
-                            narrativa_intro, p_img = resultado
-                        else:
-                            narrativa_intro = "A comitiva se reúne no início de uma grande jornada."
-                            p_img = "epic fantasy scenery"
-
-                        img_intro = gerar_imagem(p_img, together_key)
-
-                        st.session_state.historico.append({
-                            "texto": narrativa_intro,
-                            "img": img_intro,
-                            "heroi": "Prólogo da Aventura",
-                        })
+                        # Adiciona os dois quadros gerados ao histórico
+                        for quadro in quadros_prologo:
+                            st.session_state.historico.append(quadro)
 
                     st.session_state.partida_iniciada = True
                     st.rerun()
 
         except Exception as e:
             st.error(f"Erro ao processar o arquivo CSV: {e}")
-
 # ---------------------------------------------------------------------------
 # 6. TELA DO JOGO EM ANDAMENTO
 # ---------------------------------------------------------------------------
