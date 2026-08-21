@@ -68,17 +68,19 @@ def construir_prompt_dinamico_imagem(descricao_cena):
 
 
 def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_ativo):
-    """Gera dois quadros narrativos e visuais utilizando o gerador de prompt dinâmico."""
+    """Gera dois quadros narrativos e visuais blindados contra retornos nulos."""
     quadros = []
+    
+    nome_heroi = heroi_ativo.get('personagem', 'destacado') if isinstance(heroi_ativo, dict) else "destacado"
     
     prompts_prologo = [
         f"Apresentação do reino fantástico do livro '{mundo_mestre}' e a chegada da comitiva de heróis.",
-        f"O surgimento da primeira grande ameaça no horizonte de '{mundo_mestre}' e a convocação do herói {heroi_ativo.get('personagem', 'destacado')}."
+        f"O surgimento da primeira grande ameaça no horizonte de '{mundo_mestre}' e a convocação do herói {nome_heroi}."
     ]
     
     for idx, contexto in enumerate(prompts_prologo, start=1):
-        # 1. Gera a narrativa via IA
-        narrativa, _ = gerar_narrativa_rpg(
+        # 1. Busca a narrativa
+        resultado = gerar_narrativa_rpg(
             together_key,
             contexto,
             is_intro=True,
@@ -86,10 +88,16 @@ def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_a
             heroi_ativo=heroi_ativo
         )
         
-        # 2. Usa a sua função para montar o prompt de imagem
+        # 2. BLINDAGEM: Checa se a resposta é uma tupla válida antes de desempacotar
+        if isinstance(resultado, tuple) and len(resultado) == 2 and resultado[0]:
+            narrativa = resultado[0]
+        else:
+            narrativa = f"A comitiva de heróis adentra as terras mágicas de {mundo_mestre} para o início da jornada."
+        
+        # 3. Constrói o prompt de imagem
         prompt_img = construir_prompt_dinamico_imagem(descricao_cena=narrativa)
         
-        # 3. Gera a imagem correspondente
+        # 4. Gera a imagem
         img = gerar_imagem(prompt_img, together_key)
         
         quadros.append({
@@ -397,15 +405,23 @@ def gerar_desafio_inimigo(together_key, mundo_mestre, jogadores, rodada, total_r
             max_tokens=600,
             temperature=0.7,
         )
-        conteudo = response.choices[0].message.content.strip()
         
-        match = re.search(r"\{.*\}", conteudo, re.DOTALL)
-        if match:
-            dados = json.loads(match.group(0))
-            return dados
+        # Proteção contra resposta vazia da API
+        conteudo = response.choices[0].message.content if response and response.choices else None
+        
+        if conteudo:
+            match = re.search(r"\{.*\}", conteudo.strip(), re.DOTALL)
+            if match:
+                dados = json.loads(match.group(0))
+                
+                # Validação de estrutura: garante que o JSON possui todas as chaves necessárias
+                if isinstance(dados, dict) and "inimigo" in dados and "acoes" in dados:
+                    return dados
+
     except Exception as e:
         st.warning(f"Erro ao gerar desafio com validação única: {e}")
 
+    # --- RETORNO PADRÃO (Garante que a função JAMAIS retorne None) ---
     return {
         "inimigo": "Guardião de Pedra Vulcânica",
         "descricao": "Sua carcaça de pedra é imune a força física, mas suas articulações do joelho estão cobertas de limo escorregadio.",
