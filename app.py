@@ -64,58 +64,50 @@ def construir_prompt_dinamico_imagem(descricao_cena):
 
 
 def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_ativo):
-    """Gera dois quadros do prólogo garantindo a geração de imagem com fallback de segurança."""
-    quadros = []
-    
+    """Gera o panorama épico do mundo e os dois quadros visuais para a HQ."""
     nome_heroi = heroi_ativo.get("personagem", "o Jovem Herói") if isinstance(heroi_ativo, dict) else "o Jovem Herói"
 
-    textos_fallback = [
-        f"A comitiva de heróis atravessa os portões mágicos e contempla as maravilhas do reino de '{mundo_mestre}'.",
-        f"Uma grande ameaça surge no horizonte de '{mundo_mestre}'! O Mestre convoca o herói {nome_heroi} para liderar o grupo."
-    ]
-
-    prompts_prologo = [
-        f"PRÓLOGO - QUADRO 1: Descreva em tom mágico a entrada dos heróis no reino de '{mundo_mestre}'.",
-        f"PRÓLOGO - QUADRO 2: Descreva o surgimento do primeiro grande desafio em '{mundo_mestre}' convocando {nome_heroi}."
-    ]
-
-    for idx, prompt_narrativo in enumerate(prompts_prologo, start=1):
-        # 1. Gera o texto da narrativa
-        resultado = gerar_narrativa_rpg(
-            together_key,
-            prompt_narrativo,
-            is_intro=True,
-            herois_vivos=herois_vivos,
-            heroi_ativo=heroi_ativo
+    # 1. Prompt para a Narrativa Épica de Abertura
+    prompt_narrativa_geral = (
+        f"PRÓLOGO ÉPICO DE RPG: Descreva de forma mágica, envolvente e empolgante a chegada da comitiva ao reino de '{mundo_mestre}'. "
+        f"Apresente o panorama do mundo, o mistério ou desafio que acaba de surgir e convoque com entusiasmo o herói {nome_heroi} para liderar o grupo!"
+    )
+    
+    res_narrativa = gerar_narrativa_rpg(together_key, prompt_narrativa_geral, is_intro=True, herois_vivos=herois_vivos, heroi_ativo=heroi_ativo)
+    
+    if isinstance(res_narrativa, tuple) and len(res_narrativa) == 2 and res_narrativa[0]:
+        narrativa_geral = res_narrativa[0]
+    else:
+        narrativa_geral = (
+            f"✨ Os portões mágicos se abrem e revelam as maravilhas do reino de **{mundo_mestre}**! "
+            f"No entanto, um mistério antigo desperta e paira sobre estas terras. "
+            f"O Mestre convoca a coragem do bravo **{nome_heroi}** para dar o primeiro passo nesta grande jornada!"
         )
 
-        if isinstance(resultado, tuple) and len(resultado) == 2 and resultado[0]:
-            narrativa = resultado[0]
-        else:
-            narrativa = textos_fallback[idx - 1]
+    # 2. Prompts visuais dos 2 Quadros
+    prompts_quadros = [
+        f"3D Pixar render style, magical fantasy portal entrance to {mundo_mestre}, vibrant colors, epic atmosphere",
+        f"3D Pixar render style, a shadow or mysterious challenge appearing in {mundo_mestre}, hero {nome_heroi} ready for adventure"
+    ]
+    
+    legendas = [
+        f"A comitiva atravessa os portões do fantástico reino de {mundo_mestre}.",
+        f"O desafio se revela e {nome_heroi} assume a liderança!"
+    ]
 
-        # 2. Constrói o prompt limpo
-        prompt_img = construir_prompt_dinamico_imagem(descricao_cena=narrativa)
-
-        # 3. Geração da imagem com fallback
-        img = None
-        try:
-            img = gerar_imagem(prompt_img, together_key)
-        except Exception as err:
-            st.warning(f"Aviso na imagem do Quadro {idx}: {err}")
-
-        # Se a geração falhar ou retornar None, tenta com um prompt genérico simplificado
-        if not img:
-            prompt_simples = f"3D Pixar render style, epic fantasy realm {mundo_mestre}, heroic scene"
-            img = gerar_imagem(prompt_simples, together_key)
-
+    quadros = []
+    for idx, prompt_img in enumerate(prompts_quadros, start=1):
+        img = gerar_imagem(prompt_img, together_key)
         quadros.append({
-            "texto": narrativa,
+            "texto": legendas[idx - 1],
             "img": img,
             "heroi": f"Prólogo - Quadro {idx}"
         })
 
-    return quadros
+    return {
+        "narrativa_geral": narrativa_geral,
+        "quadros": quadros
+    }
 
 # ---------------------------------------------------------------------------
 # 2. CONFIGURAÇÃO DA PÁGINA E ESTADO DA SESSÃO
@@ -1064,46 +1056,27 @@ if not st.session_state.partida_iniciada:
                 st.dataframe(df, use_container_width=True)
 
                 if st.button("🚀 Iniciar Aventura e Fixar Mundo!", type="primary", key="btn_iniciar_aventura_secao5"):
-                    jogadores = []
-                    for _, row in df.iterrows():
-                        jogadores.append({
-                            "aluno": str(row[c_aluno]),
-                            "livro": str(row[c_livro]),
-                            "personagem": str(row[c_personagem]),
-                            "habilidade": str(row[c_habilidade]),
-                            "item": str(row[c_item]),
-                            "status": "VIVO",
-                            "presente": True,
-                            "moedas": 0,
-                            "tem_porcao_resgate": False,
-                        })
+    # ... (código de montagem da lista de jogadores) ...
 
-                    st.session_state.jogadores = jogadores
-                    st.session_state.mundo_mestre = jogadores[0]["livro"] if jogadores else "Mundo Mágico"
-                    sortear_proximo_aluno_automatico()
-
-                    # Geração do Prólogo com depurador
                     try:
-                        with st.spinner("🎨 Gerando o prólogo em quadro duplo..."):
-                            quadros_prologo = gerar_prologo_quadro_duplo(
+                        with st.spinner("🎨 Criando o panorama do mundo e gerando os quadros..."):
+                            dados_prologo = gerar_prologo_quadro_duplo(
                                 together_key=together_key,
                                 mundo_mestre=st.session_state.mundo_mestre,
                                 herois_vivos=jogadores,
                                 heroi_ativo=st.session_state.aluno_sorteado,
                             )
 
-                            for quadro in quadros_prologo:
+                            # Salva a narrativa geral e os quadros
+                            st.session_state.narrativa_prologo = dados_prologo["narrativa_geral"]
+                            for quadro in dados_prologo["quadros"]:
                                 st.session_state.historico.append(quadro)
 
                         st.session_state.partida_iniciada = True
                         st.rerun()
 
                     except Exception as e:
-                        st.error("🚨 Ocorreu um erro na geração do Prólogo:")
-                        st.exception(e)
-
-        except Exception as e:
-            st.error(f"Erro ao processar o arquivo CSV: {e}")
+                        st.error(f"🚨 Erro na geração do Prólogo: {e}")
 
 # ==========================================
 # 6. TELA DO JOGO EM ANDAMENTO
@@ -1112,18 +1085,27 @@ else:
     renderizar_painel_jogadores()
 
     # --- EXIBIÇÃO DO PRÓLOGO LADO A LADO (HQ) ---
-    quadros_prologo = [q for q in st.session_state.get("historico", []) if "Prólogo" in str(q.get("heroi", ""))]
-    if quadros_prologo:
-        st.markdown("### 📜 **Prólogo da Aventura**")
-        cols = st.columns(len(quadros_prologo))
-        for idx, (col, quadro) in enumerate(zip(cols, quadros_prologo), start=1):
-            with col:
-                with st.container(border=True):
-                    st.caption(f"🎨 **QUADRO {idx}**")
-                    if quadro.get("img"):
-                        st.image(quadro["img"], use_container_width=True)
-                    st.markdown(f"*{quadro['texto']}*")
-        st.divider()
+quadros_prologo = [q for q in st.session_state.get("historico", []) if "Prólogo" in str(q.get("heroi", ""))]
+
+if quadros_prologo:
+    st.markdown("### 📜 **Prólogo da Aventura**")
+    
+    # 🟢 AJUSTE: Bloco com a narrativa envolvente do panorama do mundo acima dos quadros
+    narrativa_intro = st.session_state.get("narrativa_prologo")
+    if narrativa_intro:
+        st.info(f"📖 {narrativa_intro}")
+
+    # Exibição dos quadros lado a lado
+    cols = st.columns(len(quadros_prologo))
+    for idx, (col, quadro) in enumerate(zip(cols, quadros_prologo), start=1):
+        with col:
+            with st.container(border=True):
+                st.caption(f"🎨 **QUADRO {idx}**")
+                if quadro.get("img"):
+                    st.image(quadro["img"], use_container_width=True)
+                st.markdown(f"*{quadro['texto']}*")
+
+    st.divider()
 
     # --- LÓGICA DAS RODADAS NORMALMENTE AQUI ---
     # ... restante da lógica da rodada ...
