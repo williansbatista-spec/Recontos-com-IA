@@ -68,44 +68,44 @@ def construir_prompt_dinamico_imagem(descricao_cena):
 
 
 def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_ativo):
-    """Gera dois quadros narrativos e visuais blindados contra retornos nulos."""
+    """Gera dois quadros com narrativa rica de RPG e prompts visuais para HQ."""
     quadros = []
-    
-    nome_heroi = heroi_ativo.get('personagem', 'destacado') if isinstance(heroi_ativo, dict) else "destacado"
-    
+    nome_heroi = heroi_ativo.get("personagem", "o Jovem Herói") if isinstance(heroi_ativo, dict) else "o Jovem Herói"
+
     prompts_prologo = [
-        f"Apresentação do reino fantástico do livro '{mundo_mestre}' e a chegada da comitiva de heróis.",
-        f"O surgimento da primeira grande ameaça no horizonte de '{mundo_mestre}' e a convocação do herói {nome_heroi}."
+        (
+            f"PRÓLOGO - QUADRO 1: Narre de forma mágica, imersiva e misteriosa a chegada da comitiva de heróis ao reino de '{mundo_mestre}'. "
+            f"Descreva as cores, o clima e a atmosfera encantada do ambiente de forma muito envolvente para crianças."
+        ),
+        (
+            f"PRÓLOGO - QUADRO 2: Uma sombra misteriosa ou um desafio surge no horizonte do reino de '{mundo_mestre}'! "
+            f"Narre o momento tenso e convoque com entusiasmo o herói {nome_heroi} para liderar o primeiro passo da comitiva."
+        )
     ]
-    
-    for idx, contexto in enumerate(prompts_prologo, start=1):
-        # 1. Busca a narrativa
+
+    for idx, prompt_narrativo in enumerate(prompts_prologo, start=1):
         resultado = gerar_narrativa_rpg(
             together_key,
-            contexto,
+            prompt_narrativo,
             is_intro=True,
             herois_vivos=herois_vivos,
             heroi_ativo=heroi_ativo
         )
-        
-        # 2. BLINDAGEM: Checa se a resposta é uma tupla válida antes de desempacotar
+
         if isinstance(resultado, tuple) and len(resultado) == 2 and resultado[0]:
             narrativa = resultado[0]
         else:
-            narrativa = f"A comitiva de heróis adentra as terras mágicas de {mundo_mestre} para o início da jornada."
-        
-        # 3. Constrói o prompt de imagem
+            narrativa = f"Os heróis adentram os portões do fantástico reino de {mundo_mestre}."
+
         prompt_img = construir_prompt_dinamico_imagem(descricao_cena=narrativa)
-        
-        # 4. Gera a imagem
         img = gerar_imagem(prompt_img, together_key)
-        
+
         quadros.append({
             "texto": narrativa,
             "img": img,
             "heroi": f"Prólogo - Quadro {idx}"
         })
-        
+
     return quadros
 
 # ---------------------------------------------------------------------------
