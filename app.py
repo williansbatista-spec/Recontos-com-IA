@@ -871,6 +871,9 @@ else:
                 # ==========================================
                 # LIMPEZA COMUM DA RODADA E AVANÇO
                 # ==========================================
+                # 🔄 PASSAGEM DE BASTÃO: Registra o herói atual e seu resultado para a próxima rodada
+                st.session_state["heroi_anterior"] = aluno_selecionado
+                st.session_state["sucesso_rodada_anterior"] = bool(resultado_final)
                 st.session_state.rodada_atual += 1
                 st.session_state.pergunta_atual = None
                 st.session_state.desafio_atual = None
