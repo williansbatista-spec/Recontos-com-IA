@@ -752,10 +752,10 @@ else:
             dado_ok = dado_rolado >= dc_atual
 
             # 3. Exibe o "Raio-X" da jogada para o Mestre
-            st.write("**Raio-X da Rodada:**")
-            st.write(f"- Pergunta do Livro: {'✅' if livro_ok else '❌'}")
-            st.write(f"- Estratégia Tática: {'✅' if estrategia_ok else '❌'}")
-            st.write(f"- Rolagem do Dado ({dado_rolado} vs DC {dc_atual}): {'✅' if dado_ok else '❌'}")
+            st.sidebar.write("**Raio-X da Rodada:**")
+            st.sidebar.write(f"- Pergunta do Livro: {'✅' if livro_ok else '❌'}")
+            st.sidebar.write(f"- Estratégia Tática: {'✅' if estrategia_ok else '❌'}")
+            st.sidebar.write(f"- Rolagem do Dado ({dado_rolado} vs DC {dc_atual}): {'✅' if dado_ok else '❌'}")
 
             # 4. Cálculo Automático
             sucesso_automatico = estrategia_ok and livro_ok and dado_ok
