@@ -292,22 +292,22 @@ def gerar_desafio_inimigo(together_key, mundo_mestre, jogadores, rodada, total_r
                 })
             
             return {
-                "inimigo": dados_brutos.get("inimigo", "Ameaça"),
-                "descricao": dados_brutos.get("descricao", ""),
+                "inimigo": dados_brutos.get("inimigo", "Ameaça Misteriosa"),
+                "descricao": dados_brutos.get("descricao", "Um desafio surge no caminho."),
                 "acoes": acoes_formatadas
             }
             
     except Exception as e:
         st.warning(f"Erro ao gerar desafio com validação única: {e}")
 
-    # Retorno de segurança
+    # --- RETORNO PADRÃO DE SEGURANÇA (Garante que nunca retorne None) ---
     return {
-        "inimigo": "Guardião de Pedra Vulcânica",
-        "descricao": "Sua carcaça de pedra é imune a força física, mas suas articulações do joelho estão cobertas de limo escorregadio.",
+        "inimigo": "Monstro Desconhecido",
+        "descricao": "Um obstáculo inesperado bloqueia a passagem dos heróis.",
         "acoes": [
-            {"texto": "⚔️ Golpear a carcaça no peito", "correta": False},
-            {"texto": "🔍 Focar o ataque nas articulações escorregadias do joelho", "correta": True},
-            {"texto": "🎨 Tentar assustar a criatura", "correta": False}
+            {"texto": "Atacar com coragem", "correta": True},
+            {"texto": "Recuar cautelosamente", "correta": False},
+            {"texto": "Observar o ambiente", "correta": False}
         ]
     }
 
