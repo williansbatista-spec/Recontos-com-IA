@@ -1046,13 +1046,21 @@ if not st.session_state.partida_iniciada:
                     sortear_proximo_aluno_automatico()
 
                     with st.spinner("Gerando introdução épica do mundo..."):
-                        narrativa_intro, p_img = gerar_narrativa_rpg(
+                        resultado = gerar_narrativa_rpg(
                             together_key,
                             "",
                             is_intro=True,
                             herois_vivos=jogadores,
                             heroi_ativo=st.session_state.aluno_sorteado,
                         )
+
+                        # Validação rigorosa do retorno antes do desempacotamento
+                        if isinstance(resultado, tuple) and len(resultado) == 2:
+                            narrativa_intro, p_img = resultado
+                        else:
+                            narrativa_intro = "A comitiva se reúne no início de uma grande jornada."
+                            p_img = "epic fantasy scenery"
+
                         img_intro = gerar_imagem(p_img, together_key)
 
                         st.session_state.historico.append({
