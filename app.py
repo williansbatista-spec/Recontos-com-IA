@@ -992,7 +992,7 @@ else:
                 key="btn_download_roteiro_hq"
             )
 
-        if st.sidebar.button("🗑️ Reiniciar Jogo", use_container_width=True):
+        if st.sidebar.button("🗑️ Reiniciar Jogo", use_container_width=True, key="btn_reiniciar_jogo_sidebar"):
             for key in [
                 "partida_iniciada",
                 "jogadores",
