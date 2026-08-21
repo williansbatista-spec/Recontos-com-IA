@@ -989,6 +989,7 @@ else:
                 file_name="roteiro_aula_rpg.txt",
                 mime="text/plain",
                 use_container_width=True,
+                key="btn_download_roteiro_hq"
             )
 
         if st.sidebar.button("🗑️ Reiniciar Jogo", use_container_width=True):
