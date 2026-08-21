@@ -736,7 +736,7 @@ else:
                 st.session_state.desafio_atual = None
                 st.session_state.pop("ultimo_dado", None)
                 st.rerun()
-                st.subheader("2. Decisão do Mestre (Raio-X)")
+                st.sidebar.subheader("2. Decisão do Mestre (Raio-X)")
                 aluno_selecionado = st.session_state.get("aluno_sorteado")
         if aluno_selecionado:
             acao_escolhida_texto = st.session_state.get("acao_escolhida", "Ação Tática")
