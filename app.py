@@ -1111,9 +1111,7 @@ if not st.session_state.partida_iniciada:
                     except Exception as e:
                         st.error("🚨 Ocorreu um erro no Prólogo! Veja os detalhes abaixo:")
                         st.exception(e)  # 👈 Trava a tela e exibe a mensagem vermelha com a linha exata do erro
-# ---------------------------------------------------------------------------
-# 6. TELA DO JOGO EM ANDAMENTO
-# ---------------------------------------------------------------------------
+
 # 5. TELA INICIAL: CARREGAMENTO DO CSV
 if not st.session_state.partida_iniciada:
     st.header("📂 1. Carregar Ficha da Turma (CSV)")
