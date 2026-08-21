@@ -873,12 +873,19 @@ else:
                     vivos_restantes = [v for v in vivos if v["aluno"] != aluno_selecionado["aluno"]]
 
                     with st.spinner("Gerando falha..."):
-                        narrativa, p_img = gerar_narrativa_rpg(together_key, contexto, herois_vivos=vivos_restantes, heroi_ativo=aluno_selecionado)
-                        img = gerar_imagem(p_img, together_key)
+                        # 🟢 DESEMPACOTAMENTO SEGURO: evita o erro TypeError se a API retornar None
+                        resultado = gerar_narrativa_rpg(together_key, contexto, herois_vivos=vivos_restantes, heroi_ativo=aluno_selecionado)
+    
+                    if isinstance(resultado, tuple) and len(resultado) == 2 and resultado[0]:
+                        narrativa, p_img = resultado
+                    else:
+                        narrativa = f"O herói {aluno_selecionado['personagem']} tentou bravamente, mas a ação falhou perante {inimigo_info}."
+                        p_img = f"3D Pixar render, heroic fantasy, character {aluno_selecionado['personagem']} dramatic failure scene"
 
-                        st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [FALHA - {acao_escolhida_texto}] {aluno_selecionado['personagem']} caiu perante {inimigo_info}.")
-                        st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Falha de {aluno_selecionado['personagem']}"})
+                    img = gerar_imagem(p_img, together_key)
 
+                    st.session_state.roteiro_hq.append(f"RODADA {st.session_state.rodada_atual}: [FALHA - {acao_escolhida_texto}] {aluno_selecionado['personagem']} caiu perante {inimigo_info}.")
+                    st.session_state.historico.append({"texto": narrativa, "img": img, "heroi": f"Falha de {aluno_selecionado['personagem']}"})
                 # ==========================================
                 # LIMPEZA COMUM DA RODADA E AVANÇO
                 # ==========================================
