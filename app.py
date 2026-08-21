@@ -1114,11 +1114,25 @@ if not st.session_state.partida_iniciada:
 # ---------------------------------------------------------------------------
 # 6. TELA DO JOGO EM ANDAMENTO
 # ---------------------------------------------------------------------------
+# 5. TELA INICIAL: CARREGAMENTO DO CSV
+if not st.session_state.partida_iniciada:
+    st.header("📂 1. Carregar Ficha da Turma (CSV)")
+    
+    # ... código de upload do CSV ...
+    
+    if csv_file:
+        try:
+            # ... processamento do CSV e chamada do prólogo ...
+            pass
+        except Exception as e:
+            st.error(f"Erro ao processar o arquivo CSV: {e}")
+
+# 6. TELA DO JOGO EM ANDAMENTO
 else:
     renderizar_painel_jogadores()
-
-    # --- EXIBIÇÃO DO PRÓLOGO LADO A LADO (ESTILO HQ) ---
-    quadros_prologo = [q for q in st.session_state.get("historico", []) if "Prólogo" in q.get("heroi", "")]
+    
+    # --- EXIBIÇÃO DO PRÓLOGO LADO A LADO ---
+    quadros_prologo = [q for q in st.session_state.get("historico", []) if "Prólogo" in str(q.get("heroi", ""))]
     if quadros_prologo:
         st.markdown("### 📜 **Prólogo da Aventura**")
         cols = st.columns(len(quadros_prologo))
@@ -1130,6 +1144,8 @@ else:
                         st.image(quadro["img"], use_container_width=True)
                     st.markdown(f"*{quadro['texto']}*")
         st.divider()
+
+    # ... restante da lógica da rodada ...
 
     # 1. Carrega o aluno e parâmetros da rodada (com indentação correta)
     aluno = st.session_state.get("aluno_sorteado")
