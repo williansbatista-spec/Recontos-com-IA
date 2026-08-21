@@ -29,6 +29,52 @@ def calcular_dificuldade_rodada(rodada_atual, total_rodadas):
     dc = int(8 + (progresso * 10))
     return min(dc, 18)
 
+def construir_prompt_dinamico_imagem(descricao_cena):
+    """Constrói o prompt visual unindo o herói atual em destaque e o resultado do herói anterior ao fundo."""
+
+    # 1. Recupera as informações salvas da sessão
+    heroi_atual = st.session_state.get("heroi_ativo", {})
+    heroi_anterior = st.session_state.get("heroi_anterior", None)
+    sucesso_anterior = st.session_state.get("sucesso_rodada_anterior", None)
+
+    nome_atual = heroi_atual.get("personagem", "the brave hero")
+
+    # 2. Estilo visual padrão
+    estilo = (
+        "Children's storybook illustration style, 3D Pixar render, vibrant colors, "
+        "epic fantasy lighting, dramatic perspective."
+    )
+
+    # 3. Primeiro Plano (Herói da Vez)
+    primeiro_plano = f"In the dramatic foreground, {nome_atual} steps up heroically with a determined expression, preparing to take action."
+
+    # 4. Plano de Fundo (Consequência do Herói Anterior)
+    segundo_plano = ""
+    if heroi_anterior:
+        nome_ant = heroi_anterior.get("personagem", "the previous hero")
+
+        if sucesso_anterior is False:
+            # Em caso de falha/congelamento
+            segundo_plano = (
+                f"In the background, {nome_ant} is trapped inside a glowing blue magical ice crystal, "
+                f"looking at {nome_atual} with hope."
+            )
+        elif sucesso_anterior is True:
+            # Em caso de vitória na rodada anterior
+            segundo_plano = (
+                f"In the background, {nome_ant} is catching their breath, cheering and giving a thumbs up "
+                f"to {nome_atual}."
+            )
+
+    # 5. Descrição do ambiente/cenário atual
+    contexto_ambiente = f"Environment: {descricao_cena}."
+
+    # Montagem final do prompt
+    prompt_completo = (
+        f"{estilo} {primeiro_plano} {segundo_plano} {contexto_ambiente}"
+    )
+    return prompt_completo
+
 # ---------------------------------------------------------------------------
 # 2. CONFIGURAÇÃO DA PÁGINA E ESTADO DA SESSÃO
 # ---------------------------------------------------------------------------
@@ -445,17 +491,26 @@ def gerar_narrativa_rpg(
     return narrativa.strip(), prompt_img.strip()
 
 
-def gerar_imagem(prompt_text, together_key):
-    if not together_key or not prompt_text:
+def gerar_imagem(descricao_cena, together_key):
+    if not together_key or not descricao_cena:
         return None
+
+    # 1. Gera o prompt dinâmico combinando o herói atual e o anterior
+    prompt_final = construir_prompt_dinamico_imagem(descricao_cena)
+
+    # 2. Pega o modelo escolhido pelo usuário no menu lateral (padrão: Qwen-Image)
+    modelo_selecionado = st.session_state.get(
+        "modelo_imagem_together", "Qwen/Qwen-Image"
+    )
+
     try:
         url = "https://api.together.xyz/v1/images/generations"
         payload = {
-            "model": "Qwen/Qwen-Image",
-            "prompt": prompt_text,
+            "model": modelo_selecionado,
+            "prompt": prompt_final,
             "width": 1024,
             "height": 768,
-            "steps": 30,  # 👈 AUMENTADO DE 4 PARA 30! Isso resolve o problema de qualidade.
+            "steps": 30,  # Qualidade alta mantida
             "n": 1,
             "response_format": "b64_json",
         }
@@ -478,7 +533,7 @@ def gerar_imagem(prompt_text, together_key):
                 return item["url"]
         return None
     except Exception as e:
-        st.error(f"Erro ao gerar imagem com Qwen-Image: {e}")
+        st.error(f"Erro ao gerar imagem com {modelo_selecionado}: {e}")
         return None
 
 
