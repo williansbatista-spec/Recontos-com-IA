@@ -771,7 +771,7 @@ else:
             resultado_final = sucesso_automatico or forcar_sucesso
 
             # 6. Botão Único de Avançar
-            if st.button("➡️ Avançar a História", type="primary", use_container_width=True):
+            if st.sidebar.button("➡️ Avançar a História", type="primary", use_container_width=True):
                 p_nome = obter_primeiro_nome(aluno_selecionado["aluno"])
                 
                 if resultado_final:
