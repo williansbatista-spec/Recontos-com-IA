@@ -632,8 +632,7 @@ if not st.session_state.partida_iniciada:
     )
 else:
         st.divider()
-        st.header("🕹️ Painel do Mestre")
-
+        
         vivos = [
             j
             for j in st.session_state.jogadores
