@@ -68,19 +68,20 @@ def construir_prompt_dinamico_imagem(descricao_cena):
 
 
 def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_ativo):
-    """Gera dois quadros com narrativa rica de RPG e prompts visuais para HQ."""
+    """Gera dois quadros do prólogo garantindo textos distintos para cada cena."""
     quadros = []
+    
     nome_heroi = heroi_ativo.get("personagem", "o Jovem Herói") if isinstance(heroi_ativo, dict) else "o Jovem Herói"
 
+    # Textos narrativos distintos para o fallback de cada quadro
+    textos_fallback = [
+        f"A comitiva de heróis atravessa os portões mágicos e contempla as maravilhas do reino de '{mundo_mestre}'.",
+        f"Uma grande ameaça surge no horizonte de '{mundo_mestre}'! O Mestre convoca o herói {nome_heroi} para liderar o grupo."
+    ]
+
     prompts_prologo = [
-        (
-            f"PRÓLOGO - QUADRO 1: Narre de forma mágica, imersiva e misteriosa a chegada da comitiva de heróis ao reino de '{mundo_mestre}'. "
-            f"Descreva as cores, o clima e a atmosfera encantada do ambiente de forma muito envolvente para crianças."
-        ),
-        (
-            f"PRÓLOGO - QUADRO 2: Uma sombra misteriosa ou um desafio surge no horizonte do reino de '{mundo_mestre}'! "
-            f"Narre o momento tenso e convoque com entusiasmo o herói {nome_heroi} para liderar o primeiro passo da comitiva."
-        )
+        f"PRÓLOGO - QUADRO 1: Descreva em tom mágico a entrada dos heróis no reino de '{mundo_mestre}'.",
+        f"PRÓLOGO - QUADRO 2: Descreva o surgimento do primeiro grande desafio em '{mundo_mestre}' convocando {nome_heroi}."
     ]
 
     for idx, prompt_narrativo in enumerate(prompts_prologo, start=1):
@@ -92,10 +93,11 @@ def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_a
             heroi_ativo=heroi_ativo
         )
 
+        # Se a API retornar uma tupla válida, usa o texto da IA; senão, usa o fallback específico daquele quadro
         if isinstance(resultado, tuple) and len(resultado) == 2 and resultado[0]:
             narrativa = resultado[0]
         else:
-            narrativa = f"Os heróis adentram os portões do fantástico reino de {mundo_mestre}."
+            narrativa = textos_fallback[idx - 1]
 
         prompt_img = construir_prompt_dinamico_imagem(descricao_cena=narrativa)
         img = gerar_imagem(prompt_img, together_key)
@@ -1218,13 +1220,20 @@ else:
                 resposta_aluno_idx == p_obj["resposta_correta"]
             )
 
-    st.divider()
-    st.markdown("### 📜 Diário da Jornada")
+# --------------------------------------------------
+# HISTÓRICO DA AVENTURA (DIÁRIO DA JORNADA)
+# --------------------------------------------------
+st.divider()
+st.markdown("### 📜 Diário da Jornada")
 
-    for item in reversed(st.session_state.historico):
-        with st.container():
-            st.markdown(f"#### 🎭 {item['heroi']}")
-            st.write(item["texto"])
-            if item.get("img"):
-                st.image(item["img"], use_container_width=True)
-            st.divider()
+for item in reversed(st.session_state.get("historico", [])):
+    # 🟢 TRAVA DE SEGURANÇA: ignora qualquer registro que contenha "Prólogo" no nome
+    if "Prólogo" in str(item.get("heroi", "")):
+        continue
+
+    with st.container():
+        st.markdown(f"#### 🎭 {item.get('heroi', 'Aventureiro')}")
+        st.write(item.get("texto", ""))
+        if item.get("img"):
+            st.image(item["img"], use_container_width=True)
+        st.divider()
