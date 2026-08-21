@@ -728,7 +728,7 @@ else:
                             sortear_proximo_aluno_automatico(aluno_selecionado)
                             st.rerun()
 
-            if st.button("🔄 Sortear Novamente", use_container_width=True):
+            if st.sidebar.button("🔄 Sortear Novamente", use_container_width=True):
                 sortear_proximo_aluno_automatico(
                     st.session_state.aluno_sorteado
                 )
