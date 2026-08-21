@@ -1105,6 +1105,20 @@ if not st.session_state.partida_iniciada:
 else:
     renderizar_painel_jogadores()
 
+    # --- EXIBIÇÃO DO PRÓLOGO LADO A LADO (ESTILO HQ) ---
+    quadros_prologo = [q for q in st.session_state.get("historico", []) if "Prólogo" in q.get("heroi", "")]
+    if quadros_prologo:
+        st.markdown("### 📜 **Prólogo da Aventura**")
+        cols = st.columns(len(quadros_prologo))
+        for idx, (col, quadro) in enumerate(zip(cols, quadros_prologo), start=1):
+            with col:
+                with st.container(border=True):
+                    st.caption(f"🎨 **QUADRO {idx}**")
+                    if quadro.get("img"):
+                        st.image(quadro["img"], use_container_width=True)
+                    st.markdown(f"*{quadro['texto']}*")
+        st.divider()
+
     # 1. Carrega o aluno e parâmetros da rodada (com indentação correta)
     aluno = st.session_state.get("aluno_sorteado")
     tot_rodadas = st.session_state.get("total_rodadas", 20)
@@ -1114,7 +1128,7 @@ else:
     dc_atual = calcular_dificuldade_rodada(rodada_atual, tot_rodadas)
 
     # 2. Executa a validação do turno
-       # Destaque para a Rodada e Progresso de Dificuldade (DC)
+    # Destaque para a Rodada e Progresso de Dificuldade (DC)
     col_info1, col_info2 = st.columns([2, 1])
     with col_info1:
         st.subheader(f"📍 Rodada {rodada_atual} de {tot_rodadas}")
