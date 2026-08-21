@@ -574,15 +574,23 @@ st.sidebar.selectbox(
     key="nome_modelo_amigavel"
 )
 
-# Resgata o nome amigável (ou o padrão se der erro) e converte para o ID real
-nome_amigavel = st.session_state.get("nome_modelo_amigavel", "Llama 3.3 70B (Padrão - Equilibrado e Robusto)")
-st.session_state["modelo_together"] = modelos_disponiveis.get(nome_amigavel, "meta-llama/Llama-3.3-70B-Instruct-Turbo")
+# Dicionário de Modelos de Imagem (Painel do Mestre)
+modelos_imagem_disponiveis = {
+    "Qwen Image (Detalhado / Excelente em Cenários e Estilos)": "Qwen/Qwen-Image",
+    "Playground v2.5 (Vibrante / Ideal para Pixar e Livros)": "playgroundai/playground-v2.5-1024px-aesthetic",
+    "Stable Diffusion XL 1.0 (Mais Confiável e Estável)": "stabilityai/stable-diffusion-xl-base-1.0"
+}
 
-modelo_flux = st.selectbox(
-    "🎨 Modelo de Imagem FLUX:",
-    ["black-forest-labs/FLUX.1-schnell", "black-forest-labs/FLUX.1-dev"],
+# Seletor na barra lateral
+nome_modelo_img = st.sidebar.selectbox(
+    "🎨 Modelo de Imagem:",
+    options=list(modelos_imagem_disponiveis.keys()),
+    index=0, # Qwen selecionado como padrão
+    help="Escolha qual modelo de IA vai ilustrar as cenas da história."
 )
-st.session_state["modelo_flux"] = modelo_flux
+
+# Salva a escolha na memória do app
+st.session_state["modelo_imagem_together"] = modelos_imagem_disponiveis[nome_modelo_img]
 
 if not st.session_state.partida_iniciada:
     st.header("⚙️ Parâmetros do Jogo")
