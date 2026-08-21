@@ -963,54 +963,7 @@ else:
                 st.session_state.pop(key, None)
             st.rerun()
 
-        else:
-            st.subheader("🏆 Encerrar Jogo")
-            if st.button(
-                "🎬 Gerar Gran Finale!", type="primary", use_container_width=True
-            ):
-                contexto = f"Mundo: {st.session_state.mundo_mestre}. A grande vitória de todos os heróis!"
-                with st.spinner("Finalizando história..."):
-                    narrativa, p_img = gerar_narrativa_rpg(
-                        together_key, contexto, is_final=True, herois_vivos=vivos
-                    )
-                    img_final = gerar_imagem(p_img, together_key)
-                    st.session_state.historico.append({
-                        "texto": narrativa,
-                        "img": img_final,
-                        "heroi": "VITÓRIA ÉPICA FINAL",
-                    })
-                    st.rerun()
-
-        st.divider()
-        if st.session_state.roteiro_hq:
-            st.download_button(
-                label="📥 Baixar Roteiro TXT",
-                data="\n\n".join(st.session_state.roteiro_hq),
-                file_name="roteiro_aula_rpg.txt",
-                mime="text/plain",
-                use_container_width=True,
-                key="btn_download_roteiro_hq"
-            )
-
-        if st.sidebar.button("🗑️ Reiniciar Jogo", use_container_width=True, key="btn_reiniciar_jogo_sidebar"):
-            for key in [
-                "partida_iniciada",
-                "jogadores",
-                "mundo_mestre",
-                "rodada_atual",
-                "historico",
-                "roteiro_hq",
-                "aluno_sorteado",
-                "pergunta_atual",
-                "ultimo_dado",
-                "acao_escolhida",
-                "acao_correta",
-                "desafio_atual",
-            ]:
-                st.session_state.pop(key, None)
-            st.rerun()
-
-
+       
 # ---------------------------------------------------------------------------
 # 5. TELA INICIAL: CARREGAMENTO DO CSV
 # ---------------------------------------------------------------------------
