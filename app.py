@@ -1020,6 +1020,7 @@ if not st.session_state.partida_iniciada:
 
     if csv_file:
         try:
+            # 1. Leitura e padronização do CSV
             try:
                 df = pd.read_csv(csv_file)
                 if len(df.columns) <= 1:
@@ -1038,26 +1039,33 @@ if not st.session_state.partida_iniciada:
             c_habilidade = col_map.get("habilidade")
             c_item = col_map.get("item mágico") or col_map.get("item magico") or col_map.get("item")
 
-            if not c_aluno and len(df.columns) > 0:
-                c_aluno = df.columns[0]
-            if not c_livro and len(df.columns) > 1:
-                c_livro = df.columns[1]
-            if not c_personagem and len(df.columns) > 2:
-                c_personagem = df.columns[2]
-            if not c_habilidade and len(df.columns) > 3:
-                c_habilidade = df.columns[3]
-            if not c_item and len(df.columns) > 4:
-                c_item = df.columns[4]
-
             if not all([c_aluno, c_livro, c_personagem, c_habilidade, c_item]):
                 st.error("⚠️ Colunas necessárias não encontradas no arquivo CSV!")
             else:
                 st.success(f"🟢 {len(df)} alunos carregados com sucesso!")
                 st.dataframe(df, use_container_width=True)
 
+                # 2. Botão de início de jogo
                 if st.button("🚀 Iniciar Aventura e Fixar Mundo!", type="primary", key="btn_iniciar_aventura_secao5"):
-    # ... (código de montagem da lista de jogadores) ...
+                    jogadores = []
+                    for _, row in df.iterrows():
+                        jogadores.append({
+                            "aluno": str(row[c_aluno]),
+                            "livro": str(row[c_livro]),
+                            "personagem": str(row[c_personagem]),
+                            "habilidade": str(row[c_habilidade]),
+                            "item": str(row[c_item]),
+                            "status": "VIVO",
+                            "presente": True,
+                            "moedas": 0,
+                            "tem_porcao_resgate": False,
+                        })
 
+                    st.session_state.jogadores = jogadores
+                    st.session_state.mundo_mestre = jogadores[0]["livro"] if jogadores else "Mundo Mágico"
+                    sortear_proximo_aluno_automatico()
+
+                    # 3. Geração do Prólogo com try/except dedicado
                     try:
                         with st.spinner("🎨 Criando o panorama do mundo e gerando os quadros..."):
                             dados_prologo = gerar_prologo_quadro_duplo(
@@ -1067,7 +1075,7 @@ if not st.session_state.partida_iniciada:
                                 heroi_ativo=st.session_state.aluno_sorteado,
                             )
 
-                            # Salva a narrativa geral e os quadros
+                            # Salva os dados gerados
                             st.session_state.narrativa_prologo = dados_prologo["narrativa_geral"]
                             for quadro in dados_prologo["quadros"]:
                                 st.session_state.historico.append(quadro)
@@ -1075,8 +1083,12 @@ if not st.session_state.partida_iniciada:
                         st.session_state.partida_iniciada = True
                         st.rerun()
 
-                    except Exception as e:
-                        st.error(f"🚨 Erro na geração do Prólogo: {e}")
+                    except Exception as err_prologo:
+                        st.error(f"🚨 Erro na geração do Prólogo: {err_prologo}")
+
+        # Fecha o try principal do CSV
+        except Exception as err_csv:
+            st.error(f"Erro ao processar o arquivo CSV: {err_csv}")
 
 # ==========================================
 # 6. TELA DO JOGO EM ANDAMENTO
@@ -1085,27 +1097,25 @@ else:
     renderizar_painel_jogadores()
 
     # --- EXIBIÇÃO DO PRÓLOGO LADO A LADO (HQ) ---
-quadros_prologo = [q for q in st.session_state.get("historico", []) if "Prólogo" in str(q.get("heroi", ""))]
+    quadros_prologo = [q for q in st.session_state.get("historico", []) if "Prólogo" in str(q.get("heroi", ""))]
 
-if quadros_prologo:
-    st.markdown("### 📜 **Prólogo da Aventura**")
-    
-    # 🟢 AJUSTE: Bloco com a narrativa envolvente do panorama do mundo acima dos quadros
-    narrativa_intro = st.session_state.get("narrativa_prologo")
-    if narrativa_intro:
-        st.info(f"📖 {narrativa_intro}")
+    if quadros_prologo:
+        st.markdown("### 📜 **Prólogo da Aventura**")
+        
+        narrativa_intro = st.session_state.get("narrativa_prologo")
+        if narrativa_intro:
+            st.info(f"📖 {narrativa_intro}")
 
-    # Exibição dos quadros lado a lado
-    cols = st.columns(len(quadros_prologo))
-    for idx, (col, quadro) in enumerate(zip(cols, quadros_prologo), start=1):
-        with col:
-            with st.container(border=True):
-                st.caption(f"🎨 **QUADRO {idx}**")
-                if quadro.get("img"):
-                    st.image(quadro["img"], use_container_width=True)
-                st.markdown(f"*{quadro['texto']}*")
+        cols = st.columns(len(quadros_prologo))
+        for idx, (col, quadro) in enumerate(zip(cols, quadros_prologo), start=1):
+            with col:
+                with st.container(border=True):
+                    st.caption(f"🎨 **QUADRO {idx}**")
+                    if quadro.get("img"):
+                        st.image(quadro["img"], use_container_width=True)
+                    st.markdown(f"*{quadro['texto']}*")
 
-    st.divider()
+        st.divider()
 
     # --- LÓGICA DAS RODADAS NORMALMENTE AQUI ---
     # ... restante da lógica da rodada ...
