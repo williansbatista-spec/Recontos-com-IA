@@ -761,9 +761,9 @@ else:
             sucesso_automatico = estrategia_ok and livro_ok and dado_ok
 
             if sucesso_automatico:
-                st.success("🤖 **Sistema:** SUCESSO matemático detectado!")
+                st.sidebar.success("🤖 **Sistema:** SUCESSO matemático detectado!")
             else:
-                st.error("🤖 **Sistema:** FALHA matemática detectada.")
+                st.sidebar.error("🤖 **Sistema:** FALHA matemática detectada.")
 
             # 5. O Interruptor Mágico (Override do Mestre)
             st.sidebar.divider()
