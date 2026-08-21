@@ -766,8 +766,8 @@ else:
                 st.error("🤖 **Sistema:** FALHA matemática detectada.")
 
             # 5. O Interruptor Mágico (Override do Mestre)
-            st.divider()
-            forcar_sucesso = st.toggle("✨ Substituir regra e Forçar SUCESSO (Decisão do Mestre)")
+            st.sidebar.divider()
+            forcar_sucesso = st.sidebar.toggle("✨ Substituir regra e Forçar SUCESSO (Decisão do Mestre)")
             resultado_final = sucesso_automatico or forcar_sucesso
 
             # 6. Botão Único de Avançar
