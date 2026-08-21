@@ -1028,8 +1028,7 @@ else:
 
     # 2. Executa a validação do turno
     if aluno and rodada_atual < tot_rodadas - 1:
-        st.markdown(gerar_frase_convocacao(aluno))
-    # Destaque para a Rodada e Progresso de Dificuldade (DC)
+        # Destaque para a Rodada e Progresso de Dificuldade (DC)
     col_info1, col_info2 = st.columns([2, 1])
     with col_info1:
         st.subheader(f"📍 Rodada {rodada_atual} de {tot_rodadas}")
@@ -1040,7 +1039,7 @@ else:
     # VALIDAÇÃO RIGOROSA DE AÇÃO ÚNICA
     # ==========================================
     if aluno and rodada_atual < tot_rodadas - 1:
-        st.markdown(gerar_frase_convocacao(aluno))
+        
 
     if not st.session_state.desafio_atual:
         with st.spinner("⚠️ Um novo inimigo surge..."):
