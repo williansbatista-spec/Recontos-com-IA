@@ -668,7 +668,7 @@ else:
                 sortear_proximo_aluno_automatico()
 
             aluno_selecionado = (
-                st.selectbox(
+                st.sidebar.selectbox(
                     "Herói do Turno:",
                     options=vivos,
                     index=(
