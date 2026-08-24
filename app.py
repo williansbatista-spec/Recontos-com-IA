@@ -424,47 +424,6 @@ def gerar_desafio_inimigo(together_key, mundo_mestre, jogadores, rodada, total_r
             {"texto": "🎨 Tentar assustar a criatura", "correta": False}
         ]
     }
-
-    prompt_user = f"Gere o desafio para a rodada {rodada}/{total_rodadas} no universo do livro '{mundo_mestre}'."
-
-    try:
-        response = client.chat.completions.create(
-            model=modelo,
-            messages=[
-                {"role": "system", "content": prompt_sistema},
-                {"role": "user", "content": prompt_user},
-            ],
-            max_tokens=600,
-            temperature=0.7,
-        )
-        
-        # Proteção contra resposta vazia da API
-        conteudo = response.choices[0].message.content if response and response.choices else None
-        
-        if conteudo:
-            match = re.search(r"\{.*\}", conteudo.strip(), re.DOTALL)
-            if match:
-                dados = json.loads(match.group(0))
-                
-                # Validação de estrutura: garante que o JSON possui todas as chaves necessárias
-                if isinstance(dados, dict) and "inimigo" in dados and "acoes" in dados:
-                    return dados
-
-    except Exception as e:
-        st.warning(f"Erro ao gerar desafio com validação única: {e}")
-
-    # --- RETORNO PADRÃO (Garante que a função JAMAIS retorne None) ---
-    return {
-        "inimigo": "Guardião de Pedra Vulcânica",
-        "descricao": "Sua carcaça de pedra é imune a força física, mas suas articulações do joelho estão cobertas de limo escorregadio.",
-        "acoes": [
-            {"texto": "⚔️ Golpear a carcaça no peito", "correta": False},
-            {"texto": "🔍 Focar o ataque nas articulações escorregadias do joelho", "correta": True},
-            {"texto": "🎨 Tentar assustar a criatura", "correta": False}
-        ]
-    }
-
-
 def gerar_narrativa_rpg(
     together_key,
     prompt_contexto,
