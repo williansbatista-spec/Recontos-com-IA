@@ -63,36 +63,47 @@ def construir_prompt_dinamico_imagem(descricao_cena):
     return f"{estilo} {primeiro_plano} {segundo_plano} {contexto_ambiente}"
 
 
-def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_ativo):
-    """Gera o panorama épico do mundo e os dois quadros visuais para a HQ."""
+def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_ativo, turma_nome="3º Ano B"):
+    """Gera a narrativa de abertura épica incluindo a turma e os quadros visuais da HQ."""
     nome_heroi = heroi_ativo.get("personagem", "o Jovem Herói") if isinstance(heroi_ativo, dict) else "o Jovem Herói"
 
-    # 1. Prompt para a Narrativa Épica de Abertura
+    # 1. Prompt Épico e Entusiasta com a Turma
     prompt_narrativa_geral = (
-        f"PRÓLOGO ÉPICO DE RPG: Descreva de forma mágica, envolvente e empolgante a chegada da comitiva ao reino de '{mundo_mestre}'. "
-        f"Apresente o panorama do mundo, o mistério ou desafio que acaba de surgir e convoque com entusiasmo o herói {nome_heroi} para liderar o grupo!"
+        f"PRÓLOGO ÉPICO DE RPG COM ALTO ENTUSIASMO: "
+        f"Escreva uma abertura espetacular para os alunos da turma '{turma_nome}'. "
+        f"Anuncie que os bravos e destemidos leitores do {turma_nome} cruzaram os portões do lendário reino de '{mundo_mestre}'! "
+        f"Descreva a atmosfera mágica do lugar, o grande desafio misterioso que acabou de surgir e convoque com enorme vibração "
+        f"o(a) herói(na) {nome_heroi} para liderar o primeiro movimento do grupo nesta aventura!"
     )
-    
-    res_narrativa = gerar_narrativa_rpg(together_key, prompt_narrativa_geral, is_intro=True, herois_vivos=herois_vivos, heroi_ativo=heroi_ativo)
-    
+
+    res_narrativa = gerar_narrativa_rpg(
+        together_key,
+        prompt_narrativa_geral,
+        is_intro=True,
+        herois_vivos=herois_vivos,
+        heroi_ativo=heroi_ativo
+    )
+
     if isinstance(res_narrativa, tuple) and len(res_narrativa) == 2 and res_narrativa[0]:
         narrativa_geral = res_narrativa[0]
     else:
         narrativa_geral = (
-            f"✨ Os portões mágicos se abrem e revelam as maravilhas do reino de **{mundo_mestre}**! "
-            f"No entanto, um mistério antigo desperta e paira sobre estas terras. "
-            f"O Mestre convoca a coragem do bravo **{nome_heroi}** para dar o primeiro passo nesta grande jornada!"
+            f"⚔️ **AVANTE, HEROIS DO {turma_nome.upper()}!** 🏰\n\n"
+            f"Os portões dimensionais se escancaram com um estalido mágico, e os bravos desbravadores da turma pisam em terras desconhecidas: "
+            f"bem-vindos ao fantástico reino de **{mundo_mestre}**! Onde antigas lendas ganham vida e grandes mistérios aguardam nas sombras.\n\n"
+            f"Um desafio ancestral acaba de despertar no horizonte e exige a união de todos! Para dar o primeiro passo épico e liderar a comitiva, "
+            f"o Mestre convoca a coragem e a sabedoria do(a) destemido(a) **{nome_heroi}**! 🛡️✨"
         )
 
-    # 2. Prompts visuais dos 2 Quadros
+    # 2. Prompts visuais dos 2 Quadros da HQ
     prompts_quadros = [
-        f"3D Pixar render style, magical fantasy portal entrance to {mundo_mestre}, vibrant colors, epic atmosphere",
-        f"3D Pixar render style, a shadow or mysterious challenge appearing in {mundo_mestre}, hero {nome_heroi} ready for adventure"
+        f"3D Pixar render style, epic fantasy portal entrance to {mundo_mestre}, magical atmosphere, group of young heroes looking in awe",
+        f"3D Pixar render style, mysterious shadow or glowing magical challenge in {mundo_mestre}, hero {nome_heroi} stepping forward with determination"
     ]
-    
+
     legendas = [
-        f"A comitiva atravessa os portões do fantástico reino de {mundo_mestre}.",
-        f"O desafio se revela e {nome_heroi} assume a liderança!"
+        f"Os bravos heróis do {turma_nome} cruzam o portal para {mundo_mestre}!",
+        f"O grande mistério se revela e {nome_heroi} assume a liderança!"
     ]
 
     quadros = []
@@ -1065,6 +1076,9 @@ if not st.session_state.partida_iniciada:
                     st.session_state.mundo_mestre = jogadores[0]["livro"] if jogadores else "Mundo Mágico"
                     sortear_proximo_aluno_automatico()
 
+                    # 🟢 AJUSTE 1: Pega o nome da turma (se não tiver no menu, usa "3º Ano B" como padrão)
+                    nome_da_turma = st.session_state.get("nome_turma", "3º Ano B")
+
                     # 3. Geração do Prólogo com try/except dedicado
                     try:
                         with st.spinner("🎨 Criando o panorama do mundo e gerando os quadros..."):
@@ -1073,6 +1087,7 @@ if not st.session_state.partida_iniciada:
                                 mundo_mestre=st.session_state.mundo_mestre,
                                 herois_vivos=jogadores,
                                 heroi_ativo=st.session_state.aluno_sorteado,
+                                turma_nome=nome_da_turma  # 🟢 AJUSTE 2: Envia a turma para a função
                             )
 
                             # Salva os dados gerados
