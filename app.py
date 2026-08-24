@@ -63,7 +63,15 @@ def construir_prompt_dinamico_imagem(descricao_cena):
     return f"{estilo} {primeiro_plano} {segundo_plano} {contexto_ambiente}"
 
 
-def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_ativo, turma_nome="3º Ano B"):
+def gerar_prologo_quadro_duplo(
+    together_key, 
+    mundo_mestre, 
+    herois_vivos, 
+    heroi_ativo, 
+    turma_nome="3º Ano B",
+    ameaca_nome="O Espelho Mágico",
+    ameaca_visual="ancient magic mirror covered in dust with glowing truth runes"
+):
     """Gera a narrativa de abertura épica incluindo a turma e os quadros visuais da HQ."""
     nome_heroi = heroi_ativo.get("personagem", "o Jovem Herói") if isinstance(heroi_ativo, dict) else "o Jovem Herói"
 
@@ -95,15 +103,27 @@ def gerar_prologo_quadro_duplo(together_key, mundo_mestre, herois_vivos, heroi_a
             f"o Mestre convoca a coragem e a sabedoria do(a) destemido(a) **{nome_heroi}**! 🛡️✨"
         )
 
-    # 2. Prompts visuais dos 2 Quadros da HQ
-    prompts_quadros = [
-        f"3D Pixar render style, epic fantasy portal entrance to {mundo_mestre}, magical atmosphere, group of young heroes looking in awe",
-        f"3D Pixar render style, mysterious shadow or glowing magical challenge in {mundo_mestre}, hero {nome_heroi} stepping forward with determination"
-    ]
+    # 2. Prompts visuais dos 2 Quadros da HQ (com inglês otimizado para a IA)
+    prompt_q1 = (
+        f"An epic fantasy scene of a glowing magical dimensional portal cracking open in a mystical, "
+        f"unknown realm called '{mundo_mestre}'. A large group of brave young heroes (children resembling "
+        f"a diverse {turma_nome} class dressed in fantasy RPG armor) is stepping through the portal. "
+        f"Leading the group at the very front is a fearless and heroic warrior named {nome_heroi}. "
+        f"Magical atmosphere, vibrant colors, cinematic lighting, 3D Pixar render style, highly detailed."
+    )
 
+    prompt_q2 = (
+        f"A mysterious and dangerous threat emerges: {ameaca_visual}. "
+        f"Dark fantasy, mystical and suspenseful atmosphere, "
+        f"3D Pixar render style, cinematic lighting, highly detailed."
+    )
+
+    prompts_quadros = [prompt_q1, prompt_q2]
+
+    # Legendas dinâmicas (em português para os jogadores lerem)
     legendas = [
-        f"Os bravos heróis do {turma_nome} cruzam o portal para {mundo_mestre}!",
-        f"O grande mistério se revela e {nome_heroi} assume a liderança!"
+        f"⚔️ Os bravos heróis do {turma_nome} cruzam o portal para {mundo_mestre}, liderados por {nome_heroi}!",
+        f"⚠️ Um desafio se revela no horizonte: {ameaca_nome}..."
     ]
 
     quadros = []
@@ -1083,12 +1103,14 @@ if not st.session_state.partida_iniciada:
                     try:
                         with st.spinner("🎨 Criando o panorama do mundo e gerando os quadros..."):
                             dados_prologo = gerar_prologo_quadro_duplo(
-                                together_key=together_key,
-                                mundo_mestre=st.session_state.mundo_mestre,
-                                herois_vivos=jogadores,
-                                heroi_ativo=st.session_state.aluno_sorteado,
-                                turma_nome=nome_da_turma  # 🟢 AJUSTE 2: Envia a turma para a função
-                            )
+                        together_key=together_key,
+                        mundo_mestre=st.session_state.mundo_mestre,
+                        herois_vivos=jogadores,
+                        heroi_ativo=st.session_state.aluno_sorteado,
+                        turma_nome=nome_da_turma,
+                        ameaca_nome=inimigo_sorteado_nome,        # 🟢 Passa o nome para a legenda
+                        ameaca_visual=inimigo_sorteado_visual     # 🟢 Passa a descrição em inglês para a IA
+        )
 
                             # Salva os dados gerados
                             st.session_state.narrativa_prologo = dados_prologo["narrativa_geral"]
