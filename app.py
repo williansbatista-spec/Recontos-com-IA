@@ -1096,21 +1096,25 @@ if not st.session_state.partida_iniciada:
                     st.session_state.mundo_mestre = jogadores[0]["livro"] if jogadores else "Mundo Mágico"
                     sortear_proximo_aluno_automatico()
 
-                    # 🟢 AJUSTE 1: Pega o nome da turma (se não tiver no menu, usa "3º Ano B" como padrão)
+                    # Pega o nome da turma (se não tiver no menu, usa "3º Ano B" como padrão)
                     nome_da_turma = st.session_state.get("nome_turma", "3º Ano B")
 
-                    # 3. Geração do Prólogo com try/except dedicado
+                    # 🟢 CORREÇÃO: Definindo quem é o inimigo ANTES de chamar a função!
+                    inimigo_sorteado_nome = "O Espelho Mágico"
+                    inimigo_sorteado_visual = "ancient magic mirror covered in dust with glowing truth runes"
+
+                    # Geração do Prólogo com try/except dedicado
                     try:
                         with st.spinner("🎨 Criando o panorama do mundo e gerando os quadros..."):
                             dados_prologo = gerar_prologo_quadro_duplo(
-                        together_key=together_key,
-                        mundo_mestre=st.session_state.mundo_mestre,
-                        herois_vivos=jogadores,
-                        heroi_ativo=st.session_state.aluno_sorteado,
-                        turma_nome=nome_da_turma,
-                        ameaca_nome=inimigo_sorteado_nome,        # 🟢 Passa o nome para a legenda
-                        ameaca_visual=inimigo_sorteado_visual     # 🟢 Passa a descrição em inglês para a IA
-        )
+                                together_key=together_key,
+                                mundo_mestre=st.session_state.mundo_mestre,
+                                herois_vivos=jogadores,
+                                heroi_ativo=st.session_state.aluno_sorteado,
+                                turma_nome=nome_da_turma,
+                                ameaca_nome=inimigo_sorteado_nome,        # 🟢 Agora o Python sabe quem é!
+                                ameaca_visual=inimigo_sorteado_visual     # 🟢 E sabe como ele se parece!
+                            )
 
                             # Salva os dados gerados
                             st.session_state.narrativa_prologo = dados_prologo["narrativa_geral"]
